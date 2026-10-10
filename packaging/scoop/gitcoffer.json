@@ -6,13 +6,14 @@
   "architecture": {
     "64bit": {
       "url": "https://github.com/Ziqing7226/GitCoffer/releases/download/v1.0.0/gitcoffer-1.0.0-windows-amd64.zip",
-      "hash": "fill-in-at-submission-from-checksums.txt"
+      "hash": "ec40f313027b31005504d4397db6e88fa41b3d54b41bca2cf09f2cae1637c6f9"
     },
     "arm64": {
       "url": "https://github.com/Ziqing7226/GitCoffer/releases/download/v1.0.0/gitcoffer-1.0.0-windows-arm64.zip",
-      "hash": "fill-in-at-submission-from-checksums.txt"
+      "hash": "cdcacff405b99ef252246af5d64e406fee1be3d36c529ef707831233392e9f4b"
     }
   },
+  "extract_dir": "gitcoffer-1.0.0-windows-$arch",
   "bin": ["gitcoffer.exe", "git-remote-coffer.exe"],
   "checkver": {
     "github": "https://github.com/Ziqing7226/GitCoffer"

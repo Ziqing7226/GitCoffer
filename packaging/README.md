@@ -1,8 +1,7 @@
 # Packaging manifests
 
-Ready-to-submit entries for the package stores. They target the stable
-1.0.0 release; the `sha256`/`hash` fields are filled in at submission
-time from the released archives (`checksums.txt` on the release page).
+Ready-to-submit entries for the stable 1.0.0 release, with the
+published hashes from the release's `checksums.txt` already filled in.
 
 | Store | Manifest | Destination |
 |---|---|---|
