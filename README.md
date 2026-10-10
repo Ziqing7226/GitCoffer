@@ -93,7 +93,9 @@ options):
 $ curl -fsSL https://raw.githubusercontent.com/Ziqing7226/GitCoffer/main/scripts/install.sh | sh
 ```
 
-Windows PowerShell has the equivalent `scripts/install.ps1`. For shell
+Windows PowerShell has the equivalent `scripts/install.ps1`. On macOS,
+see the user guide's macOS notes for GUI-app PATH visibility and
+Gatekeeper. For shell
 completion, run `gitcoffer completion bash` (also `zsh`, `fish`,
 `powershell`) and load its output from your shell profile.
 

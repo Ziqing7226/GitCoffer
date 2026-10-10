@@ -27,11 +27,12 @@ _gitcoffer() {
 		*)        COMPREPLY=( $(compgen -W "$global_opts" -- "$2") ) ;;
 	esac
 }
-complete -F _gitcoffer gitcoffer
+complete -o default -F _gitcoffer gitcoffer
 `
 
 const zshCompletion = `#compdef gitcoffer
-# zsh completion for gitcoffer
+# zsh completion for gitcoffer — works via eval "gitcoffer completion zsh"
+# or when installed into an fpath directory as _gitcoffer.
 _gitcoffer() {
 	local -a commands
 	commands=(
@@ -44,8 +45,9 @@ _gitcoffer() {
 		'doctor:check the environment and the vault'
 		'export-bundle:export the vault as a plain git bundle'
 		'version:print the build version'
+		'completion:print a shell completion script'
 	)
-	_arguments \
+	_arguments -C \
 		'(-h --help)'{-h,--help}'[show help]' \
 		'1: :->command' \
 		'*:: :->args'
@@ -58,14 +60,20 @@ _gitcoffer() {
 				gc) _values 'option' --prune ;;
 				key) [[ $CURRENT -eq 3 ]] && _values 'subcommand' add remove list || _files ;;
 				version) _values 'option' --json ;;
+				completion) _values 'shell' bash zsh fish powershell ;;
 				*) _files ;;
 			esac
 			;;
 	esac
 }
-_gitcoffer "$@"
+# Only run the completion when invoked by compinit's fpath mechanism;
+# when the script is eval'd, register it instead.
+if [ "$funcstack[1]" = "_gitcoffer" ]; then
+	_gitcoffer "$@"
+else
+	compdef _gitcoffer gitcoffer
+fi
 `
-
 const fishCompletion = `# fish completion for gitcoffer
 complete -c gitcoffer -n '__fish_use_subcommand' -a init -d 'create a new encrypted vault'
 complete -c gitcoffer -n '__fish_use_subcommand' -a status -d 'inspect a vault'

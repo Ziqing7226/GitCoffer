@@ -427,12 +427,19 @@ func (s *Store) ReadObject(name string) (io.ReadCloser, error) {
 	if !ok {
 		return nil, fmt.Errorf("object %q is not in the current manifest", name)
 	}
-	f, err := os.Open(filepath.Join(s.dir, objDirName, name))
+	// Object names come from the manifest, but the medium is untrusted:
+	// refuse a planted obj/<name> symlink or FIFO like every other
+	// untrusted read (bounded streaming follows the manifest's framing).
+	f, err := openNoFollowReadOnly(filepath.Join(s.dir, objDirName, name))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("%w: object file %q is missing", ErrCorrupt, name)
 		}
 		return nil, err
+	}
+	if fi, err := f.Stat(); err == nil && !fi.Mode().IsRegular() {
+		f.Close()
+		return nil, fmt.Errorf("%w: object file %q is not a regular file", ErrCorrupt, name)
 	}
 	specific := func(k int) string { return fmt.Sprintf("%s/%s/%d", s.meta.ID, name, k) }
 	r, err := crypto.ReadChunked(f, info.Size, s.dek, specific)

@@ -280,3 +280,25 @@ func TestPlantedObjSymlinkRefused(t *testing.T) {
 		t.Fatalf("the symlink target was written into: %v, %d entries", err, len(entries))
 	}
 }
+
+func TestReadObjectRefusesPlantedSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("O_NOFOLLOW is Unix-only")
+	}
+	dir := t.TempDir()
+	s, name := storeWithObject(t, dir, "pass")
+	objPath := filepath.Join(dir, objDirName, name)
+	if err := os.Remove(objPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("/dev/zero", objPath); err != nil {
+		t.Fatal(err)
+	}
+	rd, err := s.ReadObject(name)
+	if err == nil {
+		rd.Close()
+		t.Fatal("read through a planted object symlink not refused")
+	}
+	// The exact error differs by refusal kind (ELOOP from O_NOFOLLOW, or
+	// the non-regular-file check) — any refusal is the invariant.
+}

@@ -2,6 +2,13 @@
 
 ## 1.0.0 (2026-10-11)
 
+- macOS: GUI-app PATH guidance (Dock-launched VSCode does not see
+  ~/.local/bin), Gatekeeper quarantine recovery for browser downloads,
+  a zsh completion that activates via eval on the default shell, bash
+  completion falls back to file names, exFAT no longer triggers the
+  FAT32 size-cap warning, AppleDouble/.DS_Store files no longer count
+  as object files, and object-file reads refuse planted symlinks and
+  FIFOs like every other untrusted read.
 - CLI shape finalized before 1.0.0: `gitcoffer gc` is report-only by
   default and deletion requires `--prune` (the `--dry-run` flag is
   gone — the default IS the dry run). `gitcoffer version --json`

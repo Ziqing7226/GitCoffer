@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/Ziqing7226/GitCoffer/internal/vault"
 )
@@ -106,8 +107,8 @@ func doctorCmd(args []string) error {
 	// Media and leftover state.
 	if fsName, known := filesystemName(dir); known {
 		switch {
-		case fsName == "vfat" || fsName == "msdos" || fsName == "exfat":
-			d.warn("filesystem %s caps single files at 2–4 GiB; a single object file larger than that cannot be written", fsName)
+		case fsName == "vfat" || fsName == "msdos":
+			d.warn("filesystem %s caps single files at 4 GiB; a single object file larger than that cannot be written", fsName)
 		default:
 			d.ok("filesystem %s", fsName)
 		}
@@ -128,6 +129,12 @@ func doctorCmd(args []string) error {
 			}
 			if filepath.Ext(e.Name()) == ".tmp" {
 				tmps++
+				continue
+			}
+			// macOS Finder drops AppleDouble and .DS_Store files on
+			// FAT/exFAT media — foreign junk gc removes, not objects.
+			name := e.Name()
+			if strings.HasPrefix(name, "._") || name == ".DS_Store" {
 				continue
 			}
 			objs++

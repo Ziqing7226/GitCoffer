@@ -204,7 +204,10 @@ macOS:
 
 - No code path differs from Linux: POSIX fsync and atomic-rename semantics
   carry the write ordering unchanged, and terminal credential prompts
-  behave the same.
+  behave the same. One platform footnote: macOS fsync is weaker than
+  Linux's against power loss (F_FULLFSYNC is the true flush), so an
+  abrupt unplug seconds after a push could lose the last manifest
+  commit; a real eject flushes the volume.
 - Vault file names are lowercase hex digits only, so the case-insensitive
   default APFS volume cannot mangle or collide them.
 

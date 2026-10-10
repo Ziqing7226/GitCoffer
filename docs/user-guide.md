@@ -27,7 +27,22 @@ $ git-remote-coffer          # run with no arguments, prints its usage note;
 ```
 
 On Windows, the PowerShell installer
-(`scripts/install.ps1`) does the same through `Invoke-WebRequest`. For
+(`scripts/install.ps1`) does the same through `Invoke-WebRequest`.
+
+**On macOS**, two platform specifics:
+
+- **Terminal vs GUI apps.** VSCode launched from the Dock inherits
+  launchd's minimal `PATH` (`/usr/bin:/bin:/usr/sbin:/sbin`) and will
+  not find the binaries in `~/.local/bin` — pushes fail with
+  helper-not-found while Terminal works. Fix either way: launch `code`
+  from a terminal, run
+  `launchctl setenv PATH "$PATH"` before starting VSCode, or install
+  into `/usr/local/bin` (needs sudo once).
+- **Gatekeeper.** Archives downloaded with a **browser** carry the
+  `com.apple.quarantine` flag; first execution is blocked. Recover
+  once: `xattr -d com.apple.quarantine <binary>` on both binaries, or
+  allow via System Settings → Privacy & Security. The `curl`/`wget`
+  installer path adds no quarantine. For
 tab completion, load the script for your shell from your profile:
 `gitcoffer completion bash` (also `zsh`, `fish`, `powershell`).
 
