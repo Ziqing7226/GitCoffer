@@ -6,7 +6,7 @@ published hashes from the release's `checksums.txt` already filled in.
 | Store | Manifest | Destination |
 |---|---|---|
 | Homebrew | [homebrew/gitcoffer.rb](homebrew/gitcoffer.rb) | homebrew-core (or a custom tap) |
-| scoop | [scoop/gitcoffer.json](scoop/gitcoffer.json) | scoop-community/ScoopInstallerExtras or a personal bucket |
+| scoop | [scoop/gitcoffer.json](scoop/gitcoffer.json) | ScoopInstaller/Extras or a personal bucket |
 | winget | [winget/Ziqing7226.GitCoffer.yaml](winget/Ziqing7226.GitCoffer.yaml) | microsoft/winget-pkgs |
 
 Until then, users install from the [release archives](https://github.com/Ziqing7226/GitCoffer/releases),
