@@ -9,8 +9,7 @@ that lets unmodified git push to and clone from a passphrase-protected vault
 directory on a secondary or removable disk. Linux, Windows, and macOS are
 first-class; VSCode works because git works.
 
-**Current state: v1.0.0-rc.3 released, stable 1.0.0 pending the final
-security round** — vault format v1 (frozen, pinned by
+**Current state: 1.0.0 released** — vault format v1 (frozen, pinned by
 docs/test-vectors.json), the `git-remote-coffer` helper (progress
 milestones, writer lock, `--atomic`/`--force-with-lease`, server-side
 non-fast-forward protection, credential approval, HEAD fallback for
@@ -19,9 +18,7 @@ add/remove/list, rekey, gc report-only with --prune, fsck, doctor,
 export-bundle, version --json, completion), CI on Linux, Windows, and
 macOS plus a git 2.30 floor leg, three independent security review
 rounds complete, release workflow (six platforms) and packaging
-manifests under `packaging/`, and the user guide. The stable tag
-follows the final review round and device-variety testing.
-docs/development.md tracks the gate.
+manifests under `packaging/`, and the user guide. docs/development.md tracks the release gate.
 
 ## Iron Rule — English only
 

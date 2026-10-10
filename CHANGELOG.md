@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (toward 1.0.0)
+## 1.0.0 (2026-10-11)
 
 - CLI shape finalized before 1.0.0: `gitcoffer gc` is report-only by
   default and deletion requires `--prune` (the `--dry-run` flag is

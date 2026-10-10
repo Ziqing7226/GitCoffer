@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="version 1.0.0-rc.3" src="https://img.shields.io/badge/version-1.0.0--rc.3-blue">
+  <img alt="version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-blue">
   &nbsp;
   <img alt="platforms" src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-6e7681">
   &nbsp;
@@ -31,10 +31,10 @@ random-looking files; with the passphrase, the complete repository — every
 branch, tag, and commit — is reconstructed from the vault alone.
 
 Vault format v1 is frozen and pinned by published
-[test vectors](docs/test-vectors.json). This is the **v1.0.0-rc.3** release candidate:
-fully functional and tested — including crash, corruption, cross-system
-relay, and real-external-media batteries; the stable 1.0.0 tag follows
-the final review round.
+[test vectors](docs/test-vectors.json). This is the stable **1.0.0** release:
+fully functional and tested — including crash, corruption,
+cross-system relay, real-external-media batteries, a git 2.30 floor
+leg, and independent security review.
 
 ## Why
 
@@ -78,7 +78,7 @@ the helper through `PATH`; no administrator rights needed). Verify:
 
 ```console
 $ gitcoffer version
-gitcoffer v1.0.0-rc.3
+gitcoffer v1.0.0
 ```
 
 The version line is self-describing: release archives print the
@@ -100,8 +100,8 @@ completion, run `gitcoffer completion bash` (also `zsh`, `fish`,
 Or build from source with Go ≥ 1.27:
 
 ```console
-$ go install github.com/Ziqing7226/GitCoffer/cmd/gitcoffer@v1.0.0-rc.3
-$ go install github.com/Ziqing7226/GitCoffer/cmd/git-remote-coffer@v1.0.0-rc.3
+$ go install github.com/Ziqing7226/GitCoffer/cmd/gitcoffer@v1.0.0
+$ go install github.com/Ziqing7226/GitCoffer/cmd/git-remote-coffer@v1.0.0
 ```
 
 Package-manager entries (Homebrew tap, scoop bucket, winget) roll out
