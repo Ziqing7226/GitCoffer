@@ -14,6 +14,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -50,19 +51,41 @@ type vectorFile struct {
 		Plaintext string `json:"plaintext"`
 		Expected  string `json:"expected"`
 	} `json:"obj_chunk"`
+	ChunkOne struct {
+		File      string `json:"file"`
+		Nonce     string `json:"nonce"`
+		Plaintext string `json:"plaintext"`
+		Expected  string `json:"expected"`
+	} `json:"obj_chunk_1"`
+	ManifestChain struct {
+		Payload1        string `json:"payload1"`
+		Nonce1          string `json:"nonce1"`
+		Record1         string `json:"record1"`
+		Payload2        string `json:"payload2"`
+		Nonce2          string `json:"nonce2"`
+		ExpectedRecord2 string `json:"expected_record2"`
+		ExpectedPrev    string `json:"expected_prev"`
+	} `json:"manifest_chain"`
+	Argon2Note string `json:"argon2_note"`
 }
 
 // Fixed vector inputs. Anything here is public and carries no secret.
 const (
-	vecVaultID    = "0f1e2d3c4b5a69788796a5b4c3d2e1f0"
-	vecPassphrase = "correct horse battery staple"
-	vecDEKHex     = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
-	vecSaltB64    = "AAECAwQFBgcICQoLDA0ODw=="         // 00..0f
-	vecSlotNonce  = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" // 24 bytes
-	vecManNonce   = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB"
-	vecChunkNonce = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC"
-	vecFile       = "deadbeefdeadbeefdeadbeefdeadbeef"
-	vecChunkPT    = "coffer format v1 test vector payload\n"
+	vecVaultID       = "0f1e2d3c4b5a69788796a5b4c3d2e1f0"
+	vecPassphrase    = "correct horse battery staple"
+	vecDEKHex        = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+	vecSaltB64       = "AAECAwQFBgcICQoLDA0ODw=="         // 00..0f
+	vecSlotNonce     = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" // 24 bytes
+	vecManNonce      = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB"
+	vecChunkNonce    = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC"
+	vecChunk1Nonce   = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD"
+	vecChunk1PT      = "second-chunk payload pins the AAD index formatting\n"
+	vecChain1Nonce   = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE"
+	vecChain1Payload = `{"version":1,"prev":null,"refs":{}}`
+	vecChain2Nonce   = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAF"
+	vecChain2Payload = `{"version":1,"prev":"<sha256 of payload1>","refs":{}}`
+	vecFile          = "deadbeefdeadbeefdeadbeefdeadbeef"
+	vecChunkPT       = "coffer format v1 test vector payload\n"
 )
 
 func vectorDEK(t *testing.T) []byte {
@@ -145,6 +168,52 @@ func TestFormatVectors(t *testing.T) {
 		t.Fatal(err)
 	}
 	b64Equal(t, "chunk bytes", base64.StdEncoding.EncodeToString(buf.Bytes()), v.Chunk.Expected)
+
+	// Chunk index 1 (pinning the decimal k formatting in the AAD): build
+	// a two-chunk file whose second frame is the pinned one and compare
+	// only the second frame.
+	var two bytes.Buffer
+	first := bytes.Repeat([]byte{0}, ChunkSize)
+	second := []byte(v.ChunkOne.Plaintext)
+	if err := writeChunked(&two, bytes.NewReader(append(first, second...)), vectorDEK(t), specific,
+		map[int][]byte{0: bytes.Repeat([]byte{0}, NonceSize), 1: mustB64(t, v.ChunkOne.Nonce)}); err != nil {
+		t.Fatal(err)
+	}
+	frameLen := ChunkSize + NonceSize + TagSize
+	if got := two.Bytes()[frameLen:]; !bytes.Equal(got, mustB64(t, v.ChunkOne.Expected)) {
+		t.Fatalf("chunk 1 framing mismatch:\n got %x\nwant %x", got[:32], mustB64(t, v.ChunkOne.Expected)[:32])
+	}
+
+	// Chained manifests: prev is the SHA-256 of the previous manifest's
+	// plaintext payload, and generation 2's record is the pinned bytes.
+	nonce1, _ := base64.StdEncoding.DecodeString(v.ManifestChain.Nonce1)
+	rec1, err := sealManifest(vectorDEK(t), v.VaultID, []byte(v.ManifestChain.Payload1), nonce1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := base64.StdEncoding.EncodeToString(rec1); got != v.ManifestChain.Record1 {
+		t.Fatalf("chain record 1 mismatch:\n got %s\nwant %s", got, v.ManifestChain.Record1)
+	}
+	if prev := Hash([]byte(v.ManifestChain.Payload1)); prev != v.ManifestChain.ExpectedPrev {
+		t.Fatalf("expected_prev drifted: %s vs %s", prev, v.ManifestChain.ExpectedPrev)
+	}
+	nonce2, _ := base64.StdEncoding.DecodeString(v.ManifestChain.Nonce2)
+	rec2, err := sealManifest(vectorDEK(t), v.VaultID, []byte(v.ManifestChain.Payload2), nonce2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := base64.StdEncoding.EncodeToString(rec2); got != v.ManifestChain.ExpectedRecord2 {
+		t.Fatalf("chain record 2 mismatch:\n got %s\nwant %s", got, v.ManifestChain.ExpectedRecord2)
+	}
+}
+
+func mustB64(t *testing.T, s string) []byte {
+	t.Helper()
+	b, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		t.Fatalf("bad base64 %q: %v", s, err)
+	}
+	return b
 }
 
 func TestWriteFormatVectors(t *testing.T) {
@@ -179,6 +248,38 @@ func TestWriteFormatVectors(t *testing.T) {
 	v.Chunk.File, v.Chunk.Chunk, v.Chunk.Nonce = vecFile, 0, vecChunkNonce
 	v.Chunk.Plaintext = vecChunkPT
 	v.Chunk.Expected = base64.StdEncoding.EncodeToString(buf.Bytes())
+
+	// chunk index 1: second frame of a two-chunk file
+	c1Nonce, _ := base64.StdEncoding.DecodeString(vecChunk1Nonce)
+	var two bytes.Buffer
+	if err := writeChunked(&two, strings.NewReader(strings.Repeat("\x00", ChunkSize)+vecChunk1PT), vectorDEK(t), specific,
+		map[int][]byte{0: bytes.Repeat([]byte{0}, NonceSize), 1: c1Nonce}); err != nil {
+		t.Fatal(err)
+	}
+	frameLen := ChunkSize + NonceSize + TagSize
+	v.ChunkOne.File, v.ChunkOne.Nonce, v.ChunkOne.Plaintext = vecFile, vecChunk1Nonce, vecChunk1PT
+	v.ChunkOne.Expected = base64.StdEncoding.EncodeToString(two.Bytes()[frameLen:])
+
+	// chained manifests
+	m1Nonce, _ := base64.StdEncoding.DecodeString(vecChain1Nonce)
+	rec1, err := sealManifest(vectorDEK(t), vecVaultID, []byte(vecChain1Payload), m1Nonce)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prev := Hash([]byte(vecChain1Payload))
+	payload2 := fmt.Sprintf(`{"version":1,"prev":"%s","refs":{}}`, prev)
+	m2Nonce, _ := base64.StdEncoding.DecodeString(vecChain2Nonce)
+	rec2, err := sealManifest(vectorDEK(t), vecVaultID, []byte(payload2), m2Nonce)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v.ManifestChain.Payload1, v.ManifestChain.Nonce1 = vecChain1Payload, vecChain1Nonce
+	v.ManifestChain.Record1 = base64.StdEncoding.EncodeToString(rec1)
+	v.ManifestChain.Payload2 = payload2
+	v.ManifestChain.Nonce2 = vecChain2Nonce
+	v.ManifestChain.ExpectedRecord2 = base64.StdEncoding.EncodeToString(rec2)
+	v.ManifestChain.ExpectedPrev = prev
+	v.Argon2Note = "Argon2id v1.3 (RFC 9106), 32-byte output"
 
 	out, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {

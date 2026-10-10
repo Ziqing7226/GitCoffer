@@ -481,6 +481,7 @@ func (s *session) applyPush(specs []string) (err error) {
 	var report []string
 	pushed := 0
 	failed := false
+	deletedInBatch := map[string]bool{}
 	for _, spec := range specs {
 		forced := strings.HasPrefix(spec, "+")
 		spec = strings.TrimPrefix(spec, "+")
@@ -493,7 +494,18 @@ func (s *session) applyPush(specs []string) (err error) {
 		src, dst := spec[:i], spec[i+1:]
 		if src == "" { // ref deletion
 			delete(byName, dst)
+			deletedInBatch[dst] = true
 			report = append(report, "ok "+dst)
+			continue
+		}
+		// Defense in depth: re-creating a ref deleted in the same batch
+		// would bypass the non-fast-forward check (the deletion emptied
+		// the slot). git never sends this shape, but the contract holds
+		// for hand-crafted conversations too.
+		if deletedInBatch[dst] && !forced {
+			report = append(report, fmt.Sprintf(
+				"error %s non-fast-forward: this ref was deleted in the same batch — re-creating it requires --force", dst))
+			failed = true
 			continue
 		}
 		oid := src

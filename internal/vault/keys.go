@@ -229,17 +229,41 @@ func (s *Store) Rekey(newPass string) error {
 	if err := s.refreshMeta(); err != nil {
 		return err
 	}
-	fresh, err := crypto.SealSlot(s.openedSlotID, newPass, s.dek, s.meta.ID, crypto.DefaultParams())
-	if err != nil {
-		return err
-	}
 	found := false
 	for i, sl := range s.meta.Slots {
-		if sl.ID == s.openedSlotID {
-			s.meta.Slots[i] = *fresh
-			found = true
-			break
+		if sl.ID != s.openedSlotID {
+			continue
 		}
+		found = true
+		// Preserve the slot's input shape: a second-factor slot re-seals
+		// under newPass ‖ keyfile — silently downgrading it to a
+		// passphrase-only slot would strip the second factor with no
+		// warning.
+		secret := newPass
+		if sl.Input == crypto.InputPassphraseKeyfile {
+			if sl.Keyfile == "" {
+				return fmt.Errorf("slot %d requires a key file but records none — the slot cannot be re-keyed; contact the vault administrator", sl.ID)
+			}
+			path := sl.Keyfile
+			if !filepath.IsAbs(path) {
+				path = filepath.Join(s.dir, path)
+			}
+			data, err := readLimited(path, 1<<20)
+			if err != nil {
+				return fmt.Errorf("key file for slot %d: %v", sl.ID, err)
+			}
+			secret = newPass + string(data)
+		}
+		fresh, err := crypto.SealSlot(sl.ID, secret, s.dek, s.meta.ID, crypto.DefaultParams())
+		if err != nil {
+			return err
+		}
+		if sl.Input != "" {
+			fresh.Input = sl.Input
+			fresh.Keyfile = sl.Keyfile
+		}
+		s.meta.Slots[i] = *fresh
+		break
 	}
 	if !found {
 		return fmt.Errorf("the key slot this session opened (slot %d) no longer exists — another operation changed the vault's keys; re-open and try again", s.openedSlotID)

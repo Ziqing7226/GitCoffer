@@ -227,6 +227,13 @@ func initCmd(args []string) error {
 	if string(first) != string(second) {
 		return errors.New("passphrases do not match")
 	}
+	// Control characters (including newlines) would corrupt git's
+	// credential wire format — the passphrase travels through it.
+	for _, r := range first {
+		if r < 0x20 || r == 0x7f {
+			return errors.New("passphrase must not contain control characters")
+		}
+	}
 
 	s, err := vault.Create(dir, string(first), crypto.DefaultParams())
 	if err != nil {
@@ -328,6 +335,11 @@ func promptNewPassword() (string, error) {
 	}
 	if first == "" {
 		return "", errors.New("passphrase must not be empty")
+	}
+	for _, r := range first {
+		if r < 0x20 || r == 0x7f {
+			return "", errors.New("passphrase must not contain control characters")
+		}
 	}
 	second, err := promptPassword("Repeat new passphrase")
 	if err != nil {

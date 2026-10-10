@@ -219,3 +219,50 @@ func TestAddSlotRefusesAtTheCap(t *testing.T) {
 		t.Fatalf("vault unreadable at the slot cap: %v", err)
 	}
 }
+
+func TestRekeyPreservesKeyfileSecondFactor(t *testing.T) {
+	dir := t.TempDir()
+	keyfile := filepath.Join(t.TempDir(), "coffer.key")
+	s, _ := storeWithObject(t, dir, "pass-a")
+	if _, err := s.AddSlot("pass-b", keyfile); err != nil {
+		t.Fatal(err)
+	}
+	// Rekey acts on the slot the session opened: open via the second-
+	// factor slot, then rotate it.
+	keyfileBytes, err := os.ReadFile(keyfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s2, err := Open(dir, "pass-b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s2.OpenedSlotID() != 1 {
+		t.Fatalf("opened slot %d, want 1", s2.OpenedSlotID())
+	}
+	if err := s2.Rekey("pass-b2"); err != nil {
+		t.Fatal(err)
+	}
+	// The slot still requires the key file: with the key file removed,
+	// the new passphrase alone must not open the vault.
+	if err := os.Remove(keyfile); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Open(dir, "pass-b2"); err == nil {
+		t.Fatal("rekey stripped the key-file requirement")
+	}
+	if _, err := Open(dir, "pass-b"); err == nil {
+		t.Fatal("old passphrase still opens with the key file")
+	}
+	// Restore the key file: the new passphrase opens; the old pair is
+	// dead.
+	if err := os.WriteFile(keyfile, keyfileBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Open(dir, "pass-b2"); err != nil {
+		t.Fatalf("new passphrase with key file rejected: %v", err)
+	}
+	if _, err := Open(dir, "pass-b"); err == nil {
+		t.Fatal("old passphrase still opens with the key file")
+	}
+}

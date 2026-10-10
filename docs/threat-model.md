@@ -71,6 +71,13 @@ symlink's target stays untouched). On Windows, where creating symlinks
 requires developer mode or elevated privileges, the plain create remains
 the baseline.
 
+One structure is plaintext by construction: `vault.meta` must be
+readable before any key is derived, so tampering with it is not
+detectable by authentication — instead its shape is strictly validated
+(32-hex id, slot count and size caps, KDF parameter bounds), and the
+worst a medium-writer can do is lock the owner out or burn bounded
+derivation time, never to weaken an intact vault's cryptography.
+
 Reads of untrusted metadata are bounded the same way: a key-file path or
 lock file planted as a symlink, device, or FIFO is refused instead of
 read, with size caps (1 MiB for key files and vault.meta, 8 KiB for the
