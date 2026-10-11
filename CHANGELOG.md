@@ -17,6 +17,22 @@
   (`scripts/install.sh`, `scripts/install.ps1`) download, verify, and
   install release binaries in one step.
 
+- Reliability and cross-platform review round — all findings fixed:
+  export-bundle resolves its output path against the caller's directory
+  (a relative path previously vanished with the scratch repository);
+  a vault can no longer be bricked by adding a 17th key slot or by a
+  manifest growing past the 8 MiB read ceiling (both refuse honestly
+  with the vault intact); force-with-lease performs its sanctioned
+  non-fast-forward overwrites (`option cas`); rekeying a key-file slot
+  preserves the second factor instead of silently downgrading it;
+  a ref deleted and re-created in one push batch requires --force;
+  passphrases containing control characters are refused at creation;
+  dead-pid detection distinguishes reaped children (the initial
+  EPERM-as-alive hardening broke Unix lock stealing); untrusted paths
+  are sanitized before printing.
+- exFAT detection fixed: the kernel statfs magic in doctor was wrong,
+  so every real exFAT disk reported an unknown filesystem (found
+  testing on real external drives).
 - Final pre-1.0.0 security review (cold, full code) — all findings
   fixed: manifest reads are bounded and symlink-refusing like every
   other metadata read (a planted manifest.<n> symlink/FIFO/oversized
@@ -24,8 +40,10 @@
   operations re-read vault.meta under the lock so a rotation can no
   longer be silently undone by a stale snapshot; the helper surfaces
   fallback-to-older-generation instead of silently serving stale data
-  (fetch warns, push refuses with the fsck remedy, and the commit
-  slot-occupied error distinguishes damage from concurrency); a planted
+  (fetch and push warn on every operation, a later push quarantines the
+  damaged generation so the vault recovers instead of locking forever,
+  and the commit slot-occupied error distinguishes damage from
+  concurrency); a planted
   obj symlink no longer redirects object writes into an arbitrary host
   directory.
 - Windows: a crashed holder's vault.lock is now stolen immediately —
@@ -65,8 +83,7 @@
 - `gitcoffer doctor <vault>` — environment and vault health check (git
   version, helper discoverability, meta shape, key-file presence,
   filesystem characteristics, leftover state).
-- `gitcoffer gc` — report what would be reclaimed without deleting
-  deleting.
+- `gitcoffer gc` — report what would be reclaimed without deleting.
 - Pushes from Git-LFS-configured repositories warn that LFS content is
   not part of the vault.
 - Independent security review (three cold reviewers) — all confirmed
