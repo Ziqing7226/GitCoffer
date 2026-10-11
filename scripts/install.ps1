@@ -26,8 +26,8 @@ $base = "https://github.com/$Repo/releases/download/$Version"
 $tmp = New-Item -ItemType Directory -Path (Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid()))
 try {
     Write-Host "Downloading $archive"
-    Invoke-WebRequest -Uri "$base/$archive" -OutFile "$tmp/$archive"
-    Invoke-WebRequest -Uri "$base/checksums.txt" -OutFile "$tmp/checksums.txt"
+    Invoke-WebRequest -UseBasicParsing -Uri "$base/$archive" -OutFile "$tmp/$archive"
+    Invoke-WebRequest -UseBasicParsing -Uri "$base/checksums.txt" -OutFile "$tmp/checksums.txt"
 
     # Integrity: the archive must match its published sha256.
     $want = (Select-String -Path "$tmp/checksums.txt" -Pattern $archive).Line.Split(" ")[0]

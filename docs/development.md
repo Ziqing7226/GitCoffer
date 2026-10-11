@@ -190,6 +190,13 @@ then cut 1.0.0.
       (`go test -race`, govulncheck, git 2.30 floor leg, fuzz seeds).
 - [x] Server-side non-fast-forward protection (from the Windows field
       report — the data-loss risk).
+- [x] A macOS platform-expert audit (no Mac test device; expert
+      analysis substitutes for hands-on testing) — every darwin path
+      verified correct; findings were UX/hardening polish, all fixed:
+      GUI-app PATH guidance, Gatekeeper quarantine recovery, a zsh
+      completion that activates via eval on the stock shell, bash
+      filename fallback, exFAT warning accuracy, AppleDouble counting,
+      and bounded object-file reads.
 - [x] GitCoffer rename and branch hygiene: all merged working branches
       deleted; main is the line of development.
 - [x] v1.0.0-rc.1 published and verified end to end.
@@ -200,9 +207,12 @@ then cut 1.0.0.
 - [x] gc CLI finalized: report-only by default, real deletion requires
       `--prune` (the 1.0.0 window is the last chance to settle the CLI
       shape).
-- [ ] Shell completions (bash, zsh, fish, powershell).
-- [ ] install.sh / install.ps1 that verify checksums and the release
-      signature.
+- [x] Shell completions (bash, zsh, fish, powershell) via
+      `gitcoffer completion <shell>`, guard-tested against the command
+      surface.
+- [x] install.sh / install.ps1 that verify checksums against the
+      published checksums.txt (install.sh verified end to end against
+      the rc.1 release).
 - [x] A final cold security review over the complete 1.0.0 code — the
       earlier round predates export-bundle, doctor, non-fast-forward
       protection, and the gc shape. Verdict: ready with fixes; all four

@@ -302,3 +302,78 @@ func TestReadObjectRefusesPlantedSymlink(t *testing.T) {
 	// The exact error differs by refusal kind (ELOOP from O_NOFOLLOW, or
 	// the non-regular-file check) — any refusal is the invariant.
 }
+
+// TestCommitQuarantinesDamagedOccupant pins the recovery path for a
+// damaged newest manifest: the next commit renames the damaged occupant
+// aside (.corrupt, preserved for hand recovery) and lands, instead of
+// locking the vault forever. Lost once in an unrecovered working tree —
+// never again.
+func TestCommitQuarantinesDamagedOccupant(t *testing.T) {
+	dir := t.TempDir()
+	s, _ := storeWithObject(t, dir, "pass")
+	gen := s.manifestNum
+	path := filepath.Join(dir, fmt.Sprintf("%s%d", manifestPrefix, gen))
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data[len(data)-2] ^= 0x80
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	// Roll the in-memory state back one generation (as a real reload
+	// after fallback would): the next commit targets the damaged slot.
+	s.manifestNum = gen - 1
+	m := s.Manifest()
+	m.Refs["refs/heads/main"] = RefVal{OID: strings.Repeat("f", 40)}
+	if err := s.Commit(m); err != nil {
+		t.Fatalf("commit over a damaged occupant failed: %v", err)
+	}
+	if _, err := os.Stat(path + ".corrupt"); err != nil {
+		t.Fatalf("damaged occupant not quarantined: %v", err)
+	}
+	s2, err := Open(dir, "pass")
+	if err != nil {
+		t.Fatalf("vault unreadable after quarantine recovery: %v", err)
+	}
+	if s2.ManifestNum() != gen || s2.FallbackFromGeneration() != 0 {
+		t.Fatalf("recovered state wrong: gen=%d fallback=%d", s2.ManifestNum(), s2.FallbackFromGeneration())
+	}
+	if s2.Manifest().Refs["refs/heads/main"].OID != strings.Repeat("f", 40) {
+		t.Fatal("recovered ref mismatch")
+	}
+}
+
+// TestCommitRefusesNewerManifestVersion: a slot occupied by a manifest
+// from a newer GitCoffer must not be quarantined away — the push
+// refuses and points at upgrading.
+func TestCommitRefusesNewerManifestVersion(t *testing.T) {
+	dir := t.TempDir()
+	s, _ := storeWithObject(t, dir, "pass")
+	gen := s.manifestNum
+	path := filepath.Join(dir, fmt.Sprintf("%s%d", manifestPrefix, gen))
+	// Simulate the newer-version refusal: seal a v2-declaring payload
+	// with the real DEK — the slot is occupied by a manifest this build
+	// cannot read for a NON-damage reason.
+	payload := []byte(`{"version":2,"refs":{}}`)
+	record, err := crypto.SealManifest(s.dek, s.meta.ID, payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, record, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s.manifestNum = gen - 1
+	m := s.Manifest()
+	m.Refs["refs/heads/main"] = RefVal{OID: strings.Repeat("e", 40)}
+	err = s.Commit(m)
+	if err == nil || !strings.Contains(err.Error(), "newer GitCoffer") {
+		t.Fatalf("newer-version occupant not refused: %v", err)
+	}
+	if _, err := os.Stat(path + ".corrupt"); err == nil {
+		t.Fatal("newer-version manifest was quarantined as damaged")
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatal("newer-version manifest removed")
+	}
+}

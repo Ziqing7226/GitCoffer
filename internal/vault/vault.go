@@ -520,14 +520,21 @@ func (s *Store) commit(next *Manifest) error {
 	// writer committed past us (a stolen-lock race) — abort rather than
 	// overwrite its update.
 	if _, serr := os.Lstat(final); serr == nil {
-		os.Remove(tmp)
 		// Distinguish the two ways a slot can be taken: a concurrent
-		// writer committed a readable generation (retry works), or a
-		// damaged file occupies it (retry can never succeed).
+		// writer committed a readable generation (abort — retry works),
+		// or a DAMAGED file occupies it (quarantine and proceed —
+		// refusing would lock the vault forever; the owner's only
+		// recovery is a push).
 		if _, _, rerr := s.readManifestNum(newNum); rerr != nil {
-			return fmt.Errorf("manifest generation %d exists but is unreadable — a damaged file occupies the slot; run gitcoffer fsck", newNum)
+			if strings.Contains(rerr.Error(), "unsupported version") {
+				os.Remove(tmp)
+				return fmt.Errorf("manifest generation %d was written by a newer GitCoffer (unsupported manifest version) — upgrade GitCoffer instead of overwriting it", newNum)
+			}
+			os.Rename(final, final+".corrupt")
+		} else {
+			os.Remove(tmp)
+			return errors.New("manifest generation already exists — another writer committed concurrently; retry the operation")
 		}
-		return errors.New("manifest generation already exists — another writer committed concurrently; retry the operation")
 	}
 	if err := os.Rename(tmp, final); err != nil {
 		os.Remove(tmp)

@@ -17,7 +17,7 @@ func linuxFsName(magic uint64) string {
 	switch magic {
 	case 0x4d44:
 		return "vfat"
-	case 0x2011b6bb:
+	case 0x2011bab0:
 		return "exfat"
 	case 0xef53:
 		return "ext4"

@@ -20,6 +20,9 @@ need_cmd() {
     command -v "$1" >/dev/null 2>&1 || { say "error: '$1' is required but not installed"; exit 1; }
 }
 
+need_cmd grep
+need_cmd cut
+
 fetch() {
     if command -v curl >/dev/null 2>&1; then
         curl -fsSL "$1"
@@ -55,7 +58,7 @@ esac
 
 if [ "$VERSION" = "latest" ]; then
     need_cmd "grep"
-    VERSION=$(fetch "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | head -1 | cut -d'"' -f4)
+    VERSION=$(fetch "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name"' | head -n 1 | cut -d'"' -f4)
     [ -n "$VERSION" ] || { say "error: could not determine the latest release"; exit 1; }
 fi
 
@@ -70,7 +73,7 @@ fetch_file "$base/checksums.txt" "$tmp/checksums.txt"
 
 # Integrity: the archive must match its published sha256.
 cd "$tmp"
-want=$(grep "$archive" checksums.txt | cut -d' ' -f1)
+want=$(grep "$archive" checksums.txt | head -n 1 | cut -d' ' -f1)
 [ -n "$want" ] || { say "error: checksums.txt has no entry for $archive"; exit 1; }
 if command -v sha256sum >/dev/null 2>&1; then
     got=$(sha256sum "$archive" | cut -d' ' -f1)
