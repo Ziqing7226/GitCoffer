@@ -160,6 +160,10 @@ func (s *session) openStore() error {
 			"git-remote-coffer: warning: newest manifest generation %d is unreadable — serving the older generation %d; run gitcoffer fsck. Commits reported ok just before the damage may need re-pushing from the repository that made them\n",
 			f, st.ManifestNum())
 	}
+	if g := st.ChainBrokenGeneration(); g > 0 {
+		fmt.Fprintf(os.Stderr,
+			"git-remote-coffer: warning: manifest generation %d does not chain to its predecessor — possible rollback; run gitcoffer fsck\n", g)
+	}
 	// The passphrase authenticated: let git's credential helpers remember
 	// it if the user configured any (cache, osxkeychain, wincred, store).
 	// Best-effort — a failure to remember must not fail the operation.
@@ -260,6 +264,13 @@ func (s *session) handleOption(arg string) {
 		// is always emitted in list.
 		s.replySingle("ok")
 	default:
+		// depth/filter silently degrade to a full transfer — tell the
+		// user instead of letting `git clone --depth 1` pretend it
+		// worked.
+		if name == "depth" || name == "filter" {
+			fmt.Fprintf(os.Stderr,
+				"git-remote-coffer: option %s is not supported — the full history will be transferred\n", name)
+		}
 		s.replySingle("unsupported")
 	}
 }

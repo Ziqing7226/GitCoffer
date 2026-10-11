@@ -35,6 +35,10 @@ var (
 	ErrNotVault = errors.New("not a coffer vault")
 	// ErrCorrupt reports vault data that fails structural validation.
 	ErrCorrupt = errors.New("vault data corrupted")
+	// ErrNewerManifest reports a manifest written by a newer
+	// implementation (higher manifest version) — it must never be
+	// quarantined or overwritten.
+	ErrNewerManifest = errors.New("unsupported manifest version")
 )
 
 // Meta is the plaintext vault header (spec §3). It carries everything a
@@ -98,6 +102,7 @@ type Store struct {
 	lockGuard    string // content of our vault.lock, empty when unlocked
 	openedSlotID int    // key slot the current passphrase authenticated
 	fallbackFrom int    // newest manifest generation that was unreadable, 0 = none
+	chainBroken  int    // newest manifest generation whose prev does not chain, 0 = intact
 }
 
 // Dir returns the vault directory.
@@ -118,6 +123,41 @@ func (s *Store) ManifestNum() int { return s.manifestNum }
 // an older generation. Zero means no fallback happened. Callers should
 // surface this — silent fallback hides a damaged medium.
 func (s *Store) FallbackFromGeneration() int { return s.fallbackFrom }
+
+// ChainBrokenGeneration reports the newest manifest generation whose
+// prev pointer does not match the hash of the next-older generation on
+// disk — the signature of a reordered or refiled manifest (rollback).
+// Zero means the chain is intact. Callers should surface this; the
+// state itself still authenticates and is served.
+func (s *Store) ChainBrokenGeneration() int { return s.chainBroken }
+
+// verifyChain checks the adopted generation against the next-older
+// generation on disk: prev must equal the older payload's hash. Sets
+// chainBroken on mismatch. Older generations that fail to authenticate
+// are the fallback case (already tracked); a missing older generation
+// leaves the chain unverifiable (single-generation window).
+func (s *Store) verifyChain(adopted int, gens []int) {
+	idx := -1
+	for i, n := range gens {
+		if n == adopted {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 || idx+1 >= len(gens) {
+		return
+	}
+	older := gens[idx+1]
+	olderManifest, olderHash, err := s.readManifestNum(older)
+	if err != nil {
+		return // already covered by the unreadable-generation tracking
+	}
+	m := s.manifest
+	if (m.Prev == nil) || *m.Prev != olderHash {
+		s.chainBroken = adopted
+	}
+	_ = olderManifest
+}
 
 // ReadMeta reads and validates the plaintext vault header without deriving
 // any key. The header is untrusted input: the read is bounded, the vault
@@ -169,6 +209,18 @@ func isHexID(s string) bool {
 func Create(dir, passphrase string, params crypto.Argon2Params) (*Store, error) {
 	if err := os.MkdirAll(filepath.Join(dir, objDirName), 0o700); err != nil {
 		return nil, err
+	}
+	// Init is a writer like every other (spec §6): the lock closes the
+	// concurrent-init race where two inits interleave vault.meta and
+	// manifest.1 from different vault identities, leaving a vault that
+	// decrypts under neither passphrase.
+	release, _, err := acquireLock(dir)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	if _, err := os.Stat(filepath.Join(dir, metaName)); err == nil {
+		return nil, fmt.Errorf("refusing to overwrite an existing vault at %s", dir)
 	}
 	if info, err := os.Lstat(filepath.Join(dir, objDirName)); err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return nil, errors.New("the vault's object directory is missing or not a real directory — the medium may be damaged or tampered with")
@@ -267,6 +319,7 @@ func Open(dir, passphrase string) (*Store, error) {
 		}
 		s.manifest, s.manifestNum, s.payloadHash = m, n, hash
 		s.fallbackFrom = highestFailed
+		s.verifyChain(n, manifestGenerations(dir))
 		return s, nil
 	}
 	if lastErr == nil {
@@ -292,7 +345,7 @@ func (s *Store) readManifestNum(n int) (*Manifest, string, error) {
 		return nil, "", fmt.Errorf("%w: manifest %d is malformed: %v", ErrCorrupt, n, err)
 	}
 	if m.Version != crypto.FormatVersion {
-		return nil, "", fmt.Errorf("manifest %d: unsupported version %d", n, m.Version)
+		return nil, "", fmt.Errorf("%w: manifest %d declares version %d", ErrNewerManifest, n, m.Version)
 	}
 	return &m, crypto.Hash(payload), nil
 }
@@ -335,6 +388,22 @@ func (s *Store) AcquireLock() (func(), error) {
 	return release, nil
 }
 
+// verifyLockHeld re-reads vault.lock and confirms the guard still
+// matches: long operations (a slow gc pass over a large vault) can
+// outlive the staleness window, and a thief that stole the lock in the
+// meantime must cause an abort, never a deletion or overwrite on top of
+// its committed state.
+func (s *Store) verifyLockHeld() error {
+	if s.lockGuard == "" {
+		return errors.New("internal: operation is not holding the writer lock")
+	}
+	cur, err := readLimited(filepath.Join(s.dir, lockName), 8192)
+	if err != nil || string(cur) != s.lockGuard {
+		return errors.New("the writer lock was taken over during this operation — aborting without changing anything; re-run when the vault is idle")
+	}
+	return nil
+}
+
 // Reload re-reads the newest authenticating manifest generation, adopting
 // changes other writers committed since Open. Fallback tracking matches
 // Open: a damaged newest generation is surfaced via
@@ -353,6 +422,7 @@ func (s *Store) Reload() error {
 		}
 		s.manifest, s.manifestNum, s.payloadHash = m, n, hash
 		s.fallbackFrom = highestFailed
+		s.verifyChain(n, manifestGenerations(s.dir))
 		return nil
 	}
 	return fmt.Errorf("%w: no usable manifest generation on reload (%v)", ErrCorrupt, lastErr)
@@ -483,8 +553,7 @@ func (s *Store) commit(next *Manifest) error {
 	// outlived lockStaleAfter and another writer stole the lock, committing
 	// now would clobber its update.
 	if s.lockGuard != "" {
-		cur, err := readLimited(filepath.Join(s.dir, lockName), 8192)
-		if err != nil || string(cur) != s.lockGuard {
+		if err := s.verifyLockHeld(); err != nil {
 			return errors.New("vault writer lock was taken over by another operation; commit aborted — retry the operation")
 		}
 	}
@@ -526,11 +595,16 @@ func (s *Store) commit(next *Manifest) error {
 		// refusing would lock the vault forever; the owner's only
 		// recovery is a push).
 		if _, _, rerr := s.readManifestNum(newNum); rerr != nil {
-			if strings.Contains(rerr.Error(), "unsupported version") {
+			if errors.Is(rerr, ErrNewerManifest) {
 				os.Remove(tmp)
-				return fmt.Errorf("manifest generation %d was written by a newer GitCoffer (unsupported manifest version) — upgrade GitCoffer instead of overwriting it", newNum)
+				return fmt.Errorf("manifest generation %d was written by a newer GitCoffer — upgrade GitCoffer instead of overwriting it: %w", newNum, rerr)
 			}
-			os.Rename(final, final+".corrupt")
+			qname := final + ".corrupt"
+			if _, serr := os.Lstat(qname); serr == nil {
+				// Preserve any earlier quarantine evidence.
+				qname = fmt.Sprintf("%s.corrupt.%d", final, time.Now().UnixNano())
+			}
+			os.Rename(final, qname)
 		} else {
 			os.Remove(tmp)
 			return errors.New("manifest generation already exists — another writer committed concurrently; retry the operation")

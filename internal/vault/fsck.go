@@ -205,8 +205,12 @@ func Fsck(dir, passphrase string) ([]Finding, error) {
 	rootEntries, err := os.ReadDir(dir)
 	if err == nil {
 		for _, e := range rootEntries {
+			name := sanitizePath(e.Name())
 			if !e.IsDir() && filepath.Ext(e.Name()) == ".tmp" {
-				add("hygiene", fmt.Sprintf("%s is a leftover temp file (gitcoffer gc removes it)", sanitizePath(e.Name())), false)
+				add("hygiene", fmt.Sprintf("%s is a leftover temp file (gitcoffer gc removes it)", name), false)
+			}
+			if !e.IsDir() && strings.Contains(name, ".corrupt") {
+				add("hygiene", fmt.Sprintf("%s is a quarantined damaged manifest — verify the vault is healthy, then remove", name), false)
 			}
 		}
 	}

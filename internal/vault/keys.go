@@ -71,8 +71,16 @@ func (s *Store) refreshMeta() error {
 	return nil
 }
 
-// rewriteMeta atomically replaces vault.meta (spec §6, pattern 3).
+// rewriteMeta atomically replaces vault.meta (spec §6, pattern 3). The
+// take-over guard mirrors commit's: a key operation whose Argon2id work
+// outlives the staleness window must not clobber whatever the thief
+// committed.
 func (s *Store) rewriteMeta() error {
+	if s.lockGuard != "" {
+		if err := s.verifyLockHeld(); err != nil {
+			return fmt.Errorf("key operation aborted: %w", err)
+		}
+	}
 	data, err := json.MarshalIndent(s.meta, "", "  ")
 	if err != nil {
 		return err
@@ -114,7 +122,7 @@ func (s *Store) AddSlot(newPass, keyfile string) (int, error) {
 	secret := newPass
 	var created *crypto.Slot
 	if keyfile != "" {
-		keyfile, err = ensureKeyfile(keyfile)
+		keyfile, err = ensureKeyfile(s.dir, keyfile)
 		if err != nil {
 			return 0, err
 		}
@@ -150,10 +158,16 @@ const minKeyfileSize = 16
 // (users may point at a file they manage), provided it carries real
 // entropy; a missing one is created with 32 random bytes. The returned
 // path is absolute.
-func ensureKeyfile(path string) (string, error) {
+func ensureKeyfile(vaultDir, path string) (string, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return "", err
+	}
+	// A key file inside the vault directory (or the vault's own medium
+	// path) would sit next to the ciphertext it protects — the medium
+	// thief would hold the "second factor" too. Refuse at creation.
+	if vaultDir != "" && strings.HasPrefix(abs, vaultDir+string(os.PathSeparator)) {
+		return "", fmt.Errorf("key file %s is inside the vault directory — a second factor must live away from the medium it protects", abs)
 	}
 	if info, err := os.Stat(abs); err == nil {
 		if info.Size() < minKeyfileSize {

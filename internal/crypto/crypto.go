@@ -48,8 +48,14 @@ type Argon2Params struct {
 // derivation must refuse absurd values instead of allocating gigabytes or
 // panicking inside argon2 (spec §2 allows implementation-defined ceilings).
 const (
-	MaxMemoryKiB = 4 << 20 // 4 GiB
-	MaxTime      = 1 << 10
+	// Ceilings bound the worst case a planted vault.meta can impose (16
+	// slots are tried sequentially per passphrase attempt). Every creation
+	// path uses the 64 MiB / t=3 / p=4 defaults; the ceilings leave generous
+	// headroom for hand-tuned slots while keeping 16 worst-case
+	// derivations to minutes instead of hours, and the 1 GiB allocation
+	// off small-RAM hosts.
+	MaxMemoryKiB = 1 << 20 // 1 GiB
+	MaxTime      = 64
 	MaxParallel  = 255 // must fit the uint8 argon2 takes
 )
 

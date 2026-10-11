@@ -135,8 +135,12 @@ func gc(dir, passphrase string, dryRun bool) (*GCReport, error) {
 		}
 	}
 
-	// Re-enforce the generation bound (commits already prune; a vault
-	// assembled from copies may carry more).
+	// Last destructive step: re-verify the lock once more before the
+	// generation pruning.
+	if err := s.verifyLockHeld(); err != nil {
+		return nil, err
+	}
+
 	// Generation pruning: report what falls outside the kept bound. In
 	// dry-run nothing is deleted — the report lists what a real pass
 	// would prune.

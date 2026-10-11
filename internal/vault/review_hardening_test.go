@@ -377,3 +377,30 @@ func TestCommitRefusesNewerManifestVersion(t *testing.T) {
 		t.Fatal("newer-version manifest removed")
 	}
 }
+
+// TestCommitRefusesOversizedManifest pins the commit-side ceiling: a
+// manifest payload beyond the 8 MiB read cap must refuse honestly (the
+// vault stays intact) instead of committing a generation the next open
+// would reject — which would brick the vault.
+func TestCommitRefusesOversizedManifest(t *testing.T) {
+	dir := t.TempDir()
+	s, _ := storeWithObject(t, dir, "pass")
+	m := s.Manifest()
+	// Each pack entry is ~180 bytes of JSON; ~60k entries exceed 8 MiB.
+	for i := 0; len(m.Packs) < 60000; i++ {
+		name := fmt.Sprintf("%064x", i)
+		m.Packs[name] = PackInfo{
+			SHA256:  fmt.Sprintf("%064x", i),
+			Size:    1,
+			Objects: []string{fmt.Sprintf("%040x", i)},
+		}
+	}
+	err := s.Commit(m)
+	if err == nil || !strings.Contains(err.Error(), "manifest limit") {
+		t.Fatalf("oversized manifest committed: %v", err)
+	}
+	// The vault still opens with the previous, valid state.
+	if _, err := Open(dir, "pass"); err != nil {
+		t.Fatalf("vault unreadable after refused commit: %v", err)
+	}
+}

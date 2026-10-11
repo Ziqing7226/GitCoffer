@@ -42,3 +42,22 @@ func FuzzReadMeta(f *testing.F) {
 		}
 	})
 }
+
+// FuzzParseLock: vault.lock content is untrusted on-medium input —
+// parsing must never panic, and a parsed lock must satisfy the documented
+// shape.
+func FuzzParseLock(f *testing.F) {
+	f.Add([]byte("host=h\npid=1\nstarted=2026-01-01T00:00:00Z\n"))
+	f.Add([]byte("host=\npid=0\nstarted=\n"))
+	f.Add([]byte("\x00\x1b[31mgarbage"))
+	f.Add([]byte{})
+	f.Fuzz(func(t *testing.T, data []byte) {
+		info, ok := parseLock(data)
+		if !ok {
+			return
+		}
+		if info.PID < 0 {
+			t.Fatalf("parsed negative pid from %q", data)
+		}
+	})
+}

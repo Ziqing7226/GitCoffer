@@ -32,6 +32,9 @@
     "plaintext": "second-chunk payload pins the AAD index formatting\n",
     "expected": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADGSBEM00e7gJelihYODWQG7yH+1HILdDtsEWkIV/zQgHaseU74DxFqfrTMqI9k+zSDQhqTkYxtSNGUbFq6uhoRP9piQ=="
   },
+  "tampered": {
+    "record": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABPlar1JLEX50QFf1iGFw3yi8F4E5wmNYu+Bvk5hKMN87rSjlRvdQ1"
+  },
   "manifest_chain": {
     "payload1": "{\"version\":1,\"prev\":null,\"refs\":{}}",
     "nonce1": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAE",
@@ -41,5 +44,7 @@
     "expected_record2": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFdK1t11WLkETlmG68ziZ9eP6U+EwLS4wpPNJ8Rdob75BmWGhh0g69DVK7MUDEYXHfX5zunq6V9hdDWpVPrOzd6jiGuCwpIOm5iMGBosuV9hhpknxQdluOYODlI8LsSUFKmb1r4D6ogmKsy/ncc9avbLw=",
     "expected_prev": "185fc66c9d366f1a12b4bb0c242e35e972aea27bcbac88675fc4f8db8272bb19"
   },
-  "argon2_note": "Argon2id v1.3 (RFC 9106), 32-byte output"
+  "argon2_note": "Argon2id v1.3 (RFC 9106), 32-byte output",
+  "kdf_algo": "argon2id",
+  "aead_algo": "xchacha20-poly1305"
 }

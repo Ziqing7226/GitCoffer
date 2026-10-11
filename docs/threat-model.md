@@ -41,6 +41,12 @@ and, as importantly, what it does not.
   deniability and no hidden-volume features.
 - **A forgotten passphrase.** No recovery exists, by design. A key file may
   add a second factor, never a rescue.
+- **Earlier copies of the medium.** Rotating a passphrase or removing a key
+  slot protects only against someone who obtains the medium afterwards.
+  Anyone holding an earlier full copy can still decrypt the older image
+  with the then-valid passphrase — no shred is possible on
+  wear-levelled media, and the data-encryption key never rotates (spec
+  §3). Keep earlier copies in mind when rotating after exposure.
 - **A malicious writer with sustained access to the medium.** An attacker
   able to rewrite the entire vault at will can roll it back to an earlier
   consistent generation. Retaining several manifest generations

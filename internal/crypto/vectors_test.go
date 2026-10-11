@@ -57,6 +57,9 @@ type vectorFile struct {
 		Plaintext string `json:"plaintext"`
 		Expected  string `json:"expected"`
 	} `json:"obj_chunk_1"`
+	Tampered struct {
+		Record string `json:"record"`
+	} `json:"tampered"`
 	ManifestChain struct {
 		Payload1        string `json:"payload1"`
 		Nonce1          string `json:"nonce1"`
@@ -67,6 +70,8 @@ type vectorFile struct {
 		ExpectedPrev    string `json:"expected_prev"`
 	} `json:"manifest_chain"`
 	Argon2Note string `json:"argon2_note"`
+	KDFAlgo    string `json:"kdf_algo"`
+	AEADAlgo   string `json:"aead_algo"`
 }
 
 // Fixed vector inputs. Anything here is public and carries no secret.
@@ -129,6 +134,9 @@ func TestFormatVectors(t *testing.T) {
 	if v.Argon2.M != 65536 || v.Argon2.T != 3 || v.Argon2.P != 4 || v.Argon2.Salt != vecSaltB64 {
 		t.Fatalf("vector file argon2 block drifted from the pinned parameters: %+v", v.Argon2)
 	}
+	if v.KDFAlgo != KDFAlgo || v.AEADAlgo != AEADAlgo {
+		t.Fatalf("vector file algorithm names drifted: kdf=%q aead=%q", v.KDFAlgo, v.AEADAlgo)
+	}
 	salt, _ := base64.StdEncoding.DecodeString(v.Argon2.Salt)
 	params := Argon2Params{Algo: KDFAlgo, M: uint32(v.Argon2.M), T: uint32(v.Argon2.T), P: uint32(v.Argon2.P), Salt: salt}
 
@@ -157,6 +165,11 @@ func TestFormatVectors(t *testing.T) {
 	}
 	if _, err := OpenManifest(vectorDEK(t), v.VaultID, record); err != nil {
 		t.Fatalf("vector manifest does not open: %v", err)
+	}
+	// Negative vector: a tampered record must fail authentication —
+	// third parties verify rejection semantics, not just acceptance.
+	if _, err := OpenManifest(vectorDEK(t), v.VaultID, mustB64(t, v.Tampered.Record)); err == nil {
+		t.Fatal("tampered vector record authenticated")
 	}
 
 	// Object chunk framing: single chunk through the production writer.
@@ -280,6 +293,11 @@ func TestWriteFormatVectors(t *testing.T) {
 	v.ManifestChain.ExpectedRecord2 = base64.StdEncoding.EncodeToString(rec2)
 	v.ManifestChain.ExpectedPrev = prev
 	v.Argon2Note = "Argon2id v1.3 (RFC 9106), 32-byte output"
+	v.KDFAlgo = KDFAlgo
+	v.AEADAlgo = AEADAlgo
+	tampered := append([]byte{}, record...)
+	tampered[len(tampered)-1] ^= 0x80
+	v.Tampered.Record = base64.StdEncoding.EncodeToString(tampered)
 
 	out, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {

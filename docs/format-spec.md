@@ -63,7 +63,7 @@ A single JSON object, created by `gitcoffer init`, rewritten only by
         "algo": "argon2id", "m": 65536, "t": 3, "p": 4,
         "salt": "<b64, 16 bytes>"
       },
-      "aead": { "algo": "xchacha20poly1305", "nonce": "<b64, 24 bytes>" },
+      "aead": { "algo": "xchacha20-poly1305", "nonce": "<b64, 24 bytes>" },
       "dek": "<b64: AEAD(plaintext = DEK, key = KEK, nonce, AAD(\"meta-slot/<vault id>/<slot id>\"))>",
       "input": "passphrase+keyfile",
       "keyfile": "/path/to/coffer.key"
@@ -94,6 +94,9 @@ Rules:
   every slot that requires it.
 - The KEK is `Argon2id(passphrase, salt, m, t, p)` for the slot's stored
   parameters. A slot succeeds if and only if its `dek` field authenticates.
+- `salt` is 16 bytes at creation; readers SHOULD accept salts of at least
+  8 bytes (the Argon2id minimum). Vault and slot identifiers are 32
+  lowercase hex characters.
 
 ## 4. Manifest (encrypted)
 

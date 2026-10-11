@@ -266,3 +266,15 @@ func TestRekeyPreservesKeyfileSecondFactor(t *testing.T) {
 		t.Fatal("old passphrase still opens with the key file")
 	}
 }
+
+func TestKeyfileInsideVaultRefused(t *testing.T) {
+	dir := t.TempDir()
+	s, _ := storeWithObject(t, dir, "pass-a")
+	if _, err := s.AddSlot("pass-b", filepath.Join(dir, "inside.key")); err == nil ||
+		!strings.Contains(err.Error(), "inside the vault directory") {
+		t.Fatalf("in-vault keyfile not refused: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "inside.key")); err == nil {
+		t.Fatal("in-vault keyfile was created anyway")
+	}
+}
