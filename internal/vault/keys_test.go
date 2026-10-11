@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -306,6 +307,48 @@ func TestKeyfileInsideRelativeVaultRefused(t *testing.T) {
 		t.Fatalf("in-vault keyfile not refused with a relative vault dir: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(abs, "inside.key")); err == nil {
+		t.Fatal("in-vault keyfile was created anyway")
+	}
+}
+
+// TestKeyfileInsideSymlinkedVaultRefused reproduces the macOS CI failure
+// on Linux: /var → /private/var style symlinks make a CWD-derived path
+// diverge from the stored path at the first component. The containment
+// check must resolve symlinks before comparing.
+func TestKeyfileInsideSymlinkedVaultRefused(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink-based reproduction is Unix-specific")
+	}
+	outer := t.TempDir()
+	real := filepath.Join(outer, "reldir", "vault")
+	if err := os.MkdirAll(real, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := storeWithObject(t, real, "pass-a")
+	link := filepath.Join(outer, "vaultlink")
+	if err := os.Symlink(real, link); err != nil {
+		t.Fatal(err)
+	}
+
+	orig, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(orig)
+	if err := os.Chdir(outer); err != nil {
+		t.Fatal(err)
+	}
+
+	// The keyfile path travels through the symlink; the vault dir was
+	// stored via the real path. Containment must still fire.
+	if _, err := s.AddSlot("pass-b", filepath.Join("vaultlink", "inside.key")); err == nil ||
+		!strings.Contains(err.Error(), "inside the vault directory") {
+		t.Fatalf("in-vault keyfile not refused through a symlinked vault path: %v", err)
+	}
+	if _, err := os.Stat(real); err != nil {
+		t.Fatal(err)
+	}
+	if _, serr := os.Lstat(filepath.Join(real, "inside.key")); serr == nil {
 		t.Fatal("in-vault keyfile was created anyway")
 	}
 }

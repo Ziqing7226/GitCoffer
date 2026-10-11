@@ -159,6 +159,25 @@ const minKeyfileSize = 16
 // (users may point at a file they manage), provided it carries real
 // entropy; a missing one is created with 32 random bytes. The returned
 // path is absolute.
+// resolveExistingPath resolves symlinks in the longest existing prefix
+// of p and rejoins the remainder. Used where a path may not exist yet
+// (a key file being created) but must still be compared canonically.
+func resolveExistingPath(p string) string {
+	p = filepath.Clean(p)
+	suffix := ""
+	for {
+		if r, err := filepath.EvalSymlinks(p); err == nil {
+			return filepath.Join(r, suffix)
+		}
+		parent := filepath.Dir(p)
+		if parent == p {
+			return filepath.Join(p, suffix)
+		}
+		suffix = filepath.Join(filepath.Base(p), suffix)
+		p = parent
+	}
+}
+
 func ensureKeyfile(vaultDir, path string) (string, error) {
 	abs, err := filepath.Abs(path)
 	if err != nil {
@@ -173,7 +192,13 @@ func ensureKeyfile(vaultDir, path string) (string, error) {
 	if verr != nil {
 		return "", verr
 	}
-	av, ap := absVault, abs
+	// Resolve symlinks on both sides before comparing: on macOS /var is a
+	// symlink to /private/var, so a CWD-derived path and a stored path
+	// can diverge at the first component while naming the same place.
+	// Best-effort: resolved as far as the path exists (the key file may
+	// not exist yet — its missing leaf is kept and rejoined).
+	av := resolveExistingPath(absVault)
+	ap := resolveExistingPath(abs)
 	if runtime.GOOS == "windows" {
 		av, ap = strings.ToLower(av), strings.ToLower(ap)
 	}
