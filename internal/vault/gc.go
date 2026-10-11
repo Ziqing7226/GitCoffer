@@ -76,7 +76,22 @@ func gc(dir, passphrase string, dryRun bool) (*GCReport, error) {
 		if info.IsDir() {
 			continue
 		}
+		name = sanitizePath(name)
+		metadataJunk := strings.HasPrefix(name, "._") || name == ".DS_Store"
 		if strings.HasSuffix(name, ".tmp") {
+			if dryRun {
+				rep.RemovedTmp = append(rep.RemovedTmp, "obj/"+name)
+				rep.BytesFreed += info.Size()
+			} else if os.Remove(filepath.Join(dir, objDirName, name)) == nil {
+				rep.RemovedTmp = append(rep.RemovedTmp, "obj/"+name)
+				rep.BytesFreed += info.Size()
+			}
+			continue
+		}
+		if metadataJunk {
+			// macOS Finder metadata on FAT/exFAT media: junk, removed
+			// like temp files, reported under its own label so it is
+			// never mistaken for a vault object.
 			if dryRun {
 				rep.RemovedTmp = append(rep.RemovedTmp, "obj/"+name)
 				rep.BytesFreed += info.Size()

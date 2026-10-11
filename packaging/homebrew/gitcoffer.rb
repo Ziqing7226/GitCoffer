@@ -11,6 +11,7 @@ class Gitcoffer < Formula
   end
 
   depends_on "go" => :build
+  depends_on "git"
 
   def install
     ldflags = "-s -w -X main.version=v#{version}"

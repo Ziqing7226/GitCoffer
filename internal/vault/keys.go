@@ -250,7 +250,7 @@ func (s *Store) Rekey(newPass string) error {
 			}
 			data, err := readLimited(path, 1<<20)
 			if err != nil {
-				return fmt.Errorf("key file for slot %d: %v", sl.ID, err)
+				return fmt.Errorf("key file for slot %d: %v", sl.ID, sanitizePath(err.Error()))
 			}
 			secret = newPass + string(data)
 		}

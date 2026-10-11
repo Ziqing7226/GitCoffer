@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/Ziqing7226/GitCoffer/internal/crypto"
 )
@@ -191,8 +192,13 @@ func Fsck(dir, passphrase string) ([]Finding, error) {
 			if e.IsDir() {
 				continue
 			}
+			name := sanitizePath(e.Name())
+			if strings.HasSuffix(name, ".tmp") {
+				add("hygiene", fmt.Sprintf("obj/%s is a leftover temp file (gitcoffer gc removes it)", name), false)
+				continue
+			}
 			if !referenced[e.Name()] {
-				add("hygiene", fmt.Sprintf("obj/%s is referenced by no generation (gitcoffer gc removes it)", e.Name()), false)
+				add("hygiene", fmt.Sprintf("obj/%s is referenced by no generation (gitcoffer gc removes it)", name), false)
 			}
 		}
 	}
@@ -200,7 +206,7 @@ func Fsck(dir, passphrase string) ([]Finding, error) {
 	if err == nil {
 		for _, e := range rootEntries {
 			if !e.IsDir() && filepath.Ext(e.Name()) == ".tmp" {
-				add("hygiene", fmt.Sprintf("%s is a leftover temp file (gitcoffer gc removes it)", e.Name()), false)
+				add("hygiene", fmt.Sprintf("%s is a leftover temp file (gitcoffer gc removes it)", sanitizePath(e.Name())), false)
 			}
 		}
 	}

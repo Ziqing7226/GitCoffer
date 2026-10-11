@@ -81,6 +81,18 @@ func stale(info lockInfo, mtime time.Time) bool {
 	return now.Sub(mtime) > lockStaleAfter
 }
 
+// sanitizeHost strips control characters (including terminal escape
+// sequences) from the lock file's self-declared host name before it
+// reaches the user's terminal.
+func sanitizeHost(h string) string {
+	return strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return -1
+		}
+		return r
+	}, h)
+}
+
 // acquireLock takes the vault writer lock (spec §6, writer lock): an
 // exclusively created vault.lock held for the duration of one write
 // operation, so concurrent writers cannot lose each other's updates.
@@ -94,8 +106,9 @@ func acquireLock(dir string) (release func(), guard string, err error) {
 		if err == nil {
 			return func() {
 				// Remove only the lock we wrote: if it was stolen from us,
-				// it now belongs to the thief.
-				if cur, rerr := os.ReadFile(path); rerr == nil && string(cur) == guard {
+				// it now belongs to the thief. Bounded read: the lock file
+				// may have been replanted mid-operation.
+				if cur, rerr := readLimited(path, 8192); rerr == nil && string(cur) == guard {
 					os.Remove(path)
 				}
 			}, info.String(), nil
@@ -119,7 +132,7 @@ func acquireLock(dir string) (release func(), guard string, err error) {
 			os.Remove(path)
 			continue
 		}
-		holder := fmt.Sprintf("pid %d on %s", held.PID, held.Host)
+		holder := fmt.Sprintf("pid %d on %s", held.PID, sanitizeHost(held.Host))
 		if held.PID == 0 {
 			holder = "unknown holder"
 		}

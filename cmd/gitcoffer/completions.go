@@ -90,12 +90,30 @@ complete -c gitcoffer -n '__fish_seen_subcommand_from version' -l json -d 'print
 `
 
 const powershellCompletion = `# powershell completion for gitcoffer
-Register-ArgumentCompleter -CommandName gitcoffer -ScriptBlock {
+# Requires PowerShell 7+ (pwsh): native-command argument completion via
+# Register-ArgumentCompleter -Native is unavailable in Windows
+# PowerShell 5.1. Add this block to your $PROFILE.
+Register-ArgumentCompleter -CommandName gitcoffer -Native -ScriptBlock {
 	param($wordToComplete, $commandAst, $cursorPosition)
 	$commands = 'init','status','rekey','key','gc','fsck','doctor','export-bundle','version','completion'
-	if ($commandAst.CommandExtent.EndColumnPosition -le ($wordToComplete.Length + 6)) {
+	# Offer subcommands only while completing the token right after
+	# "gitcoffer"; afterwards, offer the subcommand's flags.
+	if ($commandAst.CommandElements.Count -eq 2 -and
+		$commandAst.CommandElements[1].Value -notmatch '^(init|status|rekey|key|gc|fsck|doctor|export-bundle|version|completion)$') {
 		$commands | Where-Object { $_ -like "$wordToComplete*" } |
 			ForEach-Object { [System.Management.Automation.CompletionResult]::new($_) }
+		return
+	}
+	$sub = if ($commandAst.CommandElements.Count -ge 2) { $commandAst.CommandElements[1].Value } else { '' }
+	switch ($sub) {
+		'gc' {
+			'--prune' | Where-Object { $_ -like "$wordToComplete*" } |
+				ForEach-Object { [System.Management.Automation.CompletionResult]::new($_) }
+		}
+		'version' {
+			'--json' | Where-Object { $_ -like "$wordToComplete*" } |
+				ForEach-Object { [System.Management.Automation.CompletionResult]::new($_) }
+		}
 	}
 }
 `
