@@ -21,7 +21,16 @@ func createNoFollow(path string) (*os.File, error) {
 	if err != nil {
 		return nil, &os.PathError{Op: "open", Path: path, Err: err}
 	}
-	return os.NewFile(uintptr(fd), path), nil
+	f := os.NewFile(uintptr(fd), path)
+	// O_NONBLOCK lets an existing FIFO open succeed when an attacker
+	// holds a reader — the manifest bytes would be written into the
+	// attacker's pipe and the temp renamed into place, silently losing
+	// the commit on the next open. Refuse non-regular files.
+	if fi, serr := f.Stat(); serr != nil || !fi.Mode().IsRegular() {
+		f.Close()
+		return nil, &os.PathError{Op: "open", Path: path, Err: syscall.ENODEV}
+	}
+	return f, nil
 }
 
 // openNoFollowReadOnly opens a file for reading without following a final

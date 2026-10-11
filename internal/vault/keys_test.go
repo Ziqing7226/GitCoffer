@@ -278,3 +278,34 @@ func TestKeyfileInsideVaultRefused(t *testing.T) {
 		t.Fatal("in-vault keyfile was created anyway")
 	}
 }
+
+// TestKeyfileInsideRelativeVaultRefused pins the containment bypass: a
+// RELATIVE vault directory must still refuse an in-vault key file (the
+// absolute keyfile path never has a relative-vault prefix).
+func TestKeyfileInsideRelativeVaultRefused(t *testing.T) {
+	outer := t.TempDir()
+	rel := filepath.Join("reldir", "vault")
+	abs := filepath.Join(outer, rel)
+	if err := os.MkdirAll(abs, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := storeWithObject(t, abs, "pass-a")
+
+	// chdir into the outer directory so the relative vault path resolves.
+	orig, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Chdir(orig)
+	if err := os.Chdir(outer); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.AddSlot("pass-b", filepath.Join(rel, "inside.key")); err == nil ||
+		!strings.Contains(err.Error(), "inside the vault directory") {
+		t.Fatalf("in-vault keyfile not refused with a relative vault dir: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(abs, "inside.key")); err == nil {
+		t.Fatal("in-vault keyfile was created anyway")
+	}
+}

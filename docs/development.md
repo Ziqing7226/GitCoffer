@@ -223,17 +223,10 @@ then cut 1.0.0.
 **The gate:**
 
 - [ ] v1.0.0-rc.2 published.
-- [ ] Dual-platform robustness pass: the full functional checklist
-      (init, push/pull/clone incl. non-default branches, doctor,
-      export-bundle, gc --prune, rekey with credential eviction, key
-      files, wrong-passphrase handling, corruption handling, LFS
-      pointer behavior, cross-system relay) passes on real Windows
-      hardware AND on Linux against rc.2.
-- [x] rc.2 dual-platform robustness pass — the full checklist ran twice
-      independently on real Windows hardware (and on Linux), all
-      functional areas green; the field report's findings (Windows
-      dead-holder lock lifetime, LFS warning visibility, status fallback
-      warning) are fixed or verified in the current build.
+- [x] Dual-platform robustness pass: the full functional checklist ran
+      twice independently on real Windows hardware (and on Linux), all
+      functional areas green; the field report's findings are fixed or
+      verified in the current build.
 - [ ] Stable 1.0.0, then store submissions with real hashes (the scoop
       and Homebrew repos exist; manifests in `packaging/` take the
       released hashes; winget ships as a PR from the maintainer's

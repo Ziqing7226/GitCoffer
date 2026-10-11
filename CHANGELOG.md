@@ -53,7 +53,6 @@
   area on Windows; the remaining field-report items were verified fixed
   in rc.2 (the LFS warning lives in the git-remote-coffer binary and
   fires before the pre-push hook; gitcoffer status warns on fallback).
-  testing.
 - Server-side non-fast-forward protection: a vault branch only moves to
   a descendant of its current tip unless the push is forced — unrelated
   or rewritten histories are refused with a remedy instead of silently
@@ -65,7 +64,7 @@
 - Cross-platform robustness gate passed: the full functional checklist
   ran twice independently on real Windows hardware and on Linux against
   the release-candidate binaries, including cross-system relay on one
-  vault.
+  vault and three external-device batteries (exFAT, FAT32, ext4).
 - doctor's temp-file scan covers the vault root (interrupted manifest
   writes), matching what gc sweeps — found in cross-platform field
   testing.

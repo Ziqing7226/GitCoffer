@@ -319,6 +319,7 @@ func Open(dir, passphrase string) (*Store, error) {
 		}
 		s.manifest, s.manifestNum, s.payloadHash = m, n, hash
 		s.fallbackFrom = highestFailed
+		s.chainBroken = 0
 		s.verifyChain(n, manifestGenerations(dir))
 		return s, nil
 	}
@@ -422,6 +423,7 @@ func (s *Store) Reload() error {
 		}
 		s.manifest, s.manifestNum, s.payloadHash = m, n, hash
 		s.fallbackFrom = highestFailed
+		s.chainBroken = 0
 		s.verifyChain(n, manifestGenerations(s.dir))
 		return nil
 	}
@@ -604,7 +606,10 @@ func (s *Store) commit(next *Manifest) error {
 				// Preserve any earlier quarantine evidence.
 				qname = fmt.Sprintf("%s.corrupt.%d", final, time.Now().UnixNano())
 			}
-			os.Rename(final, qname)
+			if rerr := os.Rename(final, qname); rerr != nil {
+				os.Remove(tmp)
+				return fmt.Errorf("failed to quarantine the damaged manifest %s: %v — nothing was overwritten", final, rerr)
+			}
 		} else {
 			os.Remove(tmp)
 			return errors.New("manifest generation already exists — another writer committed concurrently; retry the operation")

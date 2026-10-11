@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/Ziqing7226/GitCoffer/internal/crypto"
@@ -163,10 +164,20 @@ func ensureKeyfile(vaultDir, path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// A key file inside the vault directory (or the vault's own medium
-	// path) would sit next to the ciphertext it protects — the medium
-	// thief would hold the "second factor" too. Refuse at creation.
-	if vaultDir != "" && strings.HasPrefix(abs, vaultDir+string(os.PathSeparator)) {
+	// A key file inside the vault directory would sit next to the
+	// ciphertext it protects — the medium thief would hold the "second
+	// factor" too. Refuse at creation. Containment is resolved against
+	// the ABSOLUTE vault dir (a relative vault dir would bypass a prefix
+	// check) with a case-insensitive fallback for Windows volumes.
+	absVault, verr := filepath.Abs(vaultDir)
+	if verr != nil {
+		return "", verr
+	}
+	av, ap := absVault, abs
+	if runtime.GOOS == "windows" {
+		av, ap = strings.ToLower(av), strings.ToLower(ap)
+	}
+	if rel, rerr := filepath.Rel(av, ap); rerr == nil && !strings.HasPrefix(rel, "..") {
 		return "", fmt.Errorf("key file %s is inside the vault directory — a second factor must live away from the medium it protects", abs)
 	}
 	if info, err := os.Stat(abs); err == nil {

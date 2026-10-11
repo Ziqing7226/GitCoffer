@@ -250,10 +250,12 @@ func (s *session) handleOption(arg string) {
 		// git-receive-pack honors. A stale lease never reaches us (git
 		// rejects it client-side against our advertised refs).
 		ref, expect, ok := strings.Cut(value, ":")
-		if !ok || ref == "" || expect == "" {
+		if !ok || ref == "" {
 			s.replySingle("error cas expects <ref>:<expected-oid>")
 			return
 		}
+		// An empty expectation leases the ref into nonexistence — the
+		// "--force-with-lease=<ref>:" form.
 		if s.cas == nil {
 			s.cas = make(map[string]string)
 		}
@@ -536,14 +538,20 @@ func (s *session) applyPush(specs []string) (err error) {
 		// client's own check does not protect here — a caller without
 		// the vault's objects cannot verify ancestry and may send
 		// anyway, which would silently overwrite the branch.
-		if old, exists := byName[dst]; exists && !forced {
-			// A matching force-with-lease sanctions the overwrite: the
-			// client verified the remote tip equals the leased value.
-			if s.cas[dst] == old.OID {
-				forced = true
+		old, exists := byName[dst]
+		// force-with-lease sanction: a matching lease (or an empty lease
+		// on a nonexistent ref) sanctions the update the way --force
+		// does; a mismatched lease falls through to the non-FF check.
+		leased := false
+		if expect, ok := s.cas[dst]; ok {
+			if exists && expect == old.OID {
+				leased = true
+			}
+			if !exists && expect == "" {
+				leased = true
 			}
 		}
-		if old, exists := byName[dst]; exists && !forced {
+		if exists && !forced && !leased {
 			if oid == old.OID {
 				// No-op update: falls through as a fast-forward of itself.
 			} else if !packproc.ExistsInCaller(old.OID) {

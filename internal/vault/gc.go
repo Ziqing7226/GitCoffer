@@ -62,6 +62,16 @@ func gc(dir, passphrase string, dryRun bool) (*GCReport, error) {
 		}
 	}
 
+	// The scan (decrypting every retained generation) can take minutes on
+	// a large vault: re-verify the lock BEFORE the sweep. If the
+	// stale-looking lock was stolen mid-scan, the thief's just-committed
+	// objects are absent from this reference set — sweeping now would
+	// destroy a reported-ok push. Aborting is always safe: nothing has
+	// been deleted yet.
+	if err := s.verifyLockHeld(); err != nil {
+		return nil, err
+	}
+
 	// Sweep obj/: unreferenced object files and .tmp leftovers.
 	entries, err := os.ReadDir(filepath.Join(dir, objDirName))
 	if err != nil {
@@ -76,14 +86,14 @@ func gc(dir, passphrase string, dryRun bool) (*GCReport, error) {
 		if info.IsDir() {
 			continue
 		}
-		name = sanitizePath(name)
+		report := sanitizePath(name)
 		metadataJunk := strings.HasPrefix(name, "._") || name == ".DS_Store"
 		if strings.HasSuffix(name, ".tmp") {
 			if dryRun {
-				rep.RemovedTmp = append(rep.RemovedTmp, "obj/"+name)
+				rep.RemovedTmp = append(rep.RemovedTmp, "obj/"+report)
 				rep.BytesFreed += info.Size()
 			} else if os.Remove(filepath.Join(dir, objDirName, name)) == nil {
-				rep.RemovedTmp = append(rep.RemovedTmp, "obj/"+name)
+				rep.RemovedTmp = append(rep.RemovedTmp, "obj/"+report)
 				rep.BytesFreed += info.Size()
 			}
 			continue
@@ -93,20 +103,20 @@ func gc(dir, passphrase string, dryRun bool) (*GCReport, error) {
 			// like temp files, reported under its own label so it is
 			// never mistaken for a vault object.
 			if dryRun {
-				rep.RemovedTmp = append(rep.RemovedTmp, "obj/"+name)
+				rep.RemovedTmp = append(rep.RemovedTmp, "obj/"+report)
 				rep.BytesFreed += info.Size()
 			} else if os.Remove(filepath.Join(dir, objDirName, name)) == nil {
-				rep.RemovedTmp = append(rep.RemovedTmp, "obj/"+name)
+				rep.RemovedTmp = append(rep.RemovedTmp, "obj/"+report)
 				rep.BytesFreed += info.Size()
 			}
 			continue
 		}
 		if !referenced[name] {
 			if dryRun {
-				rep.RemovedObjects = append(rep.RemovedObjects, name)
+				rep.RemovedObjects = append(rep.RemovedObjects, report)
 				rep.BytesFreed += info.Size()
 			} else if os.Remove(filepath.Join(dir, objDirName, name)) == nil {
-				rep.RemovedObjects = append(rep.RemovedObjects, name)
+				rep.RemovedObjects = append(rep.RemovedObjects, report)
 				rep.BytesFreed += info.Size()
 			}
 		}
