@@ -81,11 +81,12 @@ func doctorCmd(args []string) error {
 			if sl.Input != "passphrase+keyfile" || sl.Keyfile == "" {
 				continue
 			}
+			// Sanitize before display; the containment-relevant path
+			// operations use the raw value.
 			path := sanitizePath(sl.Keyfile)
 			if !filepath.IsAbs(path) {
 				path = filepath.Join(dir, path)
 			}
-			path = sanitizePath(path)
 			info, serr := os.Lstat(path)
 			switch {
 			case serr != nil:

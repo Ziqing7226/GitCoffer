@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.0 (2026-10-11)
+## Unreleased (toward 1.0.0)
 
 - macOS: GUI-app PATH guidance (Dock-launched VSCode does not see
   ~/.local/bin), Gatekeeper quarantine recovery for browser downloads,
