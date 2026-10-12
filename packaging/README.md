@@ -1,6 +1,8 @@
 # Packaging manifests
 
-Store manifests for the stable 1.0.0 release. The `sha256`/`hash`
+Store manifests for the stable 1.0.0 release. The winget submission is
+the three-file split structure — the community repository's validation
+rejects singleton manifests for new-package submissions. The `sha256`/`hash`
 fields are filled from that release's `checksums.txt` (verified
 against the downloaded archives).
 
@@ -8,7 +10,7 @@ against the downloaded archives).
 |---|---|---|
 | Homebrew | [homebrew/gitcoffer.rb](homebrew/gitcoffer.rb) | homebrew-core (or a custom tap) |
 | scoop | [scoop/gitcoffer.json](scoop/gitcoffer.json) | ScoopInstaller/Extras or a personal bucket |
-| winget | [winget/Ziqing7226.GitCoffer.yaml](winget/Ziqing7226.GitCoffer.yaml) | microsoft/winget-pkgs |
+| winget | [winget/manifests/](winget/manifests/) (three-file split: version, installer, defaultLocale) | microsoft/winget-pkgs, `manifests/z/Ziqing7226/GitCoffer/1.0.0/` |
 
 Until then, users install from the [release archives](https://github.com/Ziqing7226/GitCoffer/releases),
 with `go install github.com/Ziqing7226/GitCoffer/cmd/{gitcoffer,git-remote-coffer}@<tag>`, or with the
