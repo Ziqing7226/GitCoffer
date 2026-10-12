@@ -256,6 +256,13 @@ decision, not an omission:
 
 ## The 1.1.0 work plan (named by the maintainer, 2026-10-12)
 
+**Compatibility rule: upgrading to 1.1.0 must not change existing
+vaults.** The check command is read-only; key-file and repack changes
+apply only when the user acts on a vault; format v2 exists only for
+new vaults or an explicit, per-vault migration — and a 1.0.0 binary
+refuses a v2 vault with the honest newer-version error rather than
+damaging anything.
+
 - **Vault check command** — a three-state probe in the style of
   git-remote-gcrypt's `--check`: exit 0 = vault exists and opens with
   the supplied passphrase; 1 = it is a vault but does not open (wrong
