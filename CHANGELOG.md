@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- README: an "Inside VSCode" section shows the native-editor experience
+  — publish, the passphrase prompt, in-sync state, and the built-in
+  commit graph — as four screenshots taken against a real vault on a
+  USB drive.
 - development.md: the maintainer named the 1.1.0 work plan — a
   three-state vault check command, migratable key-file paths, gc
   repacking, and the format-v2 manifest-generation AAD binding — and

@@ -206,6 +206,38 @@ the vault and your passphrase reconstruct everything.
 Full walkthrough — keys and recovery, maintenance, troubleshooting:
 [docs/user-guide.md](docs/user-guide.md).
 
+## Inside VSCode
+
+Nothing new to learn: the vault is a remote, so the editor's built-in
+git tooling behaves exactly as it does with any host. Publishing asks
+for the passphrase once, through git's own native prompt — after that,
+Sync, the incoming/outgoing counters, and the commit graph all read
+from the encrypted vault on your disk. These screenshots show a real
+vault on a USB drive, pushed from the editor itself:
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="docs/assets/vscode-publish.png" width="380" alt="VSCode Source Control view with the Publish Branch button"><br>
+      <em>Publish Branch — one button, as with any remote</em>
+    </td>
+    <td width="50%">
+      <img src="docs/assets/vscode-password.png" width="380" alt="VSCode native password prompt for the coffer vault"><br>
+      <em>The passphrase arrives through git's native credential prompt</em>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <img src="docs/assets/vscode-synced.png" width="380" alt="VSCode Source Control view in sync, 0 down 0 up, origin/main current"><br>
+      <em>In sync: 0↓ 0↑, origin/main current</em>
+    </td>
+    <td>
+      <img src="docs/assets/vscode-graph.png" width="380" alt="VSCode built-in commit graph with main and origin/main refs"><br>
+      <em>The built-in commit graph, remote refs included</em>
+    </td>
+  </tr>
+</table>
+
 ## Security scope
 
 <p align="center">
