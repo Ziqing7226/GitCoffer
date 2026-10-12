@@ -21,7 +21,7 @@ put both binaries on `PATH`. Verify with:
 
 ```console
 $ gitcoffer version
-gitcoffer v1.0.0-rc.5
+gitcoffer v1.0.0
 $ git-remote-coffer          # run with no arguments, prints its usage note;
                              # normally git invokes it for you
 ```
@@ -53,11 +53,11 @@ repository build reports the commit it was built from.
 **Build from source** with Go ≥ 1.27:
 
 ```console
-$ go install github.com/Ziqing7226/GitCoffer/cmd/gitcoffer@v1.0.0-rc.5
-$ go install github.com/Ziqing7226/GitCoffer/cmd/git-remote-coffer@v1.0.0-rc.5
+$ go install github.com/Ziqing7226/GitCoffer/cmd/gitcoffer@v1.0.0
+$ go install github.com/Ziqing7226/GitCoffer/cmd/git-remote-coffer@v1.0.0
 ```
 
-Package-manager entries (Homebrew, scoop, winget) ship with the stable
+Package-manager entries (Homebrew, scoop, winget) are submitted with this
 1.0.0 release.
 
 **Windows note:** add the install directory to `PATH` via system settings;

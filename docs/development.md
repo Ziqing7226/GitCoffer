@@ -227,7 +227,10 @@ then cut 1.0.0.
       twice independently on real Windows hardware (and on Linux), all
       functional areas green; the field report's findings are fixed or
       verified in the current build.
-- [ ] Stable 1.0.0, then store submissions with real hashes (the scoop
+- [x] Stable 1.0.0 — tagged at the exact commit rc.7 tested, after the
+      dual-platform device gate closed (Windows full battery green two
+      rounds per rc; Linux official-binary triple-disk matrix green).
+- [ ] Store submissions with real hashes (the scoop
       and Homebrew repos exist; manifests in `packaging/` take the
       released hashes; winget ships as a PR from the maintainer's
       fork).

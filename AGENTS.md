@@ -9,7 +9,7 @@ that lets unmodified git push to and clone from a passphrase-protected vault
 directory on a secondary or removable disk. Linux, Windows, and macOS are
 first-class; VSCode works because git works.
 
-**Current state: v1.0.0-rc.5 released; stable 1.0.0 pending the device-test gate** — vault format v1 (frozen, pinned by
+**Current state: v1.0.0 released** — vault format v1 (frozen, pinned by
 docs/test-vectors.json), the `git-remote-coffer` helper (progress
 milestones, writer lock, `--atomic`/`--force-with-lease`, server-side
 non-fast-forward protection, credential approval, HEAD fallback for

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (toward 1.0.0)
+## 1.0.0 (2026-10-12)
 
 - macOS review of the rc.3→rc.6 delta — all findings fixed: the
   key-file containment check compares directory identity along the

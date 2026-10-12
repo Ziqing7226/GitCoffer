@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="version 1.0.0-rc.5" src="https://img.shields.io/badge/version-1.0.0--rc.5-blue">
+  <img alt="version 1.0.0" src="https://img.shields.io/badge/version-1.0.0-blue">
   &nbsp;
   <img alt="platforms" src="https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-6e7681">
   &nbsp;
@@ -31,11 +31,11 @@ random-looking files; with the passphrase, the complete repository — every
 branch, tag, and commit — is reconstructed from the vault alone.
 
 Vault format v1 is frozen and pinned by published
-[test vectors](docs/test-vectors.json). This is the **v1.0.0-rc.5** release candidate:
-fully functional and tested — including crash, corruption,
-cross-system relay, real-external-media batteries, a git 2.30 floor
-leg, and independent security review; the stable 1.0.0 tag follows the
-dual-platform device-test gate.
+[test vectors](docs/test-vectors.json). This is the **1.0.0** stable
+release — the format the release candidates have been writing all
+along, after seven release candidates of fix-and-reverify across three
+operating systems and real external media
+([how Coffer is tested](#how-coffer-is-tested)).
 
 ## Why
 
@@ -56,6 +56,23 @@ dual-platform device-test gate.
 - **Single static binary.** No GPG, no FUSE, no drivers, no administrator
   rights. The vault is plain files, so exFAT and FAT32 media are fully
   supported.
+
+## The backup drive is the weakest link
+
+Self-hosted git platforms — Gitea, GitLab, Forgejo — keep repositories
+in plaintext on the server disk, and that is by design: the server reads
+them for every clone, diff, and search, and full-disk encryption covers
+the machine in the rack. The routine file copy to a portable drive for
+offsite backup is the different story. The moment it leaves the server,
+it is outside every one of those protections — and it is the one copy
+that travels in bags, moves between machines, and eventually gets lost.
+
+Coffer exists for exactly that copy: make the backup job a `git push`
+into a vault instead of a copy of plaintext, and the offsite drive holds
+nothing readable. Two honest boundaries: a vault stores git data —
+commits, branches, tags — not a forge's issues, wikis, or CI records
+(keep the platform's own dump for those), and it is one-way offsite
+storage, not a live server backend.
 
 ## How it works
 
@@ -79,7 +96,7 @@ the helper through `PATH`; no administrator rights needed). Verify:
 
 ```console
 $ gitcoffer version
-gitcoffer v1.0.0-rc.5
+gitcoffer v1.0.0
 ```
 
 The version line is self-describing: release archives print the
@@ -103,12 +120,12 @@ completion, run `gitcoffer completion bash` (also `zsh`, `fish`,
 Or build from source with Go ≥ 1.27:
 
 ```console
-$ go install github.com/Ziqing7226/GitCoffer/cmd/gitcoffer@v1.0.0-rc.5
-$ go install github.com/Ziqing7226/GitCoffer/cmd/git-remote-coffer@v1.0.0-rc.5
+$ go install github.com/Ziqing7226/GitCoffer/cmd/gitcoffer@v1.0.0
+$ go install github.com/Ziqing7226/GitCoffer/cmd/git-remote-coffer@v1.0.0
 ```
 
-Package-manager entries (Homebrew tap, scoop bucket, winget) roll out
-alongside this release.
+Package-manager entries (Homebrew tap, scoop bucket, winget) are
+submitted alongside this release.
 
 ## Quick start
 
@@ -142,6 +159,35 @@ only git, Coffer, and the passphrase are needed:
 $ git config --global url."coffer::/mnt/usb/".insteadOf "usb://"
 $ git remote add origin usb://myproject.coffer
 ```
+
+## Moving an existing project onto a vault
+
+No import, no conversion — a vault is just another remote.
+
+Already have the project cloned (your current branch and tags):
+
+```console
+$ gitcoffer init /mnt/usb/myproject.coffer
+$ git remote add vault coffer::/mnt/usb/myproject.coffer
+$ git push vault --all     # every branch that exists in this clone
+$ git push vault --tags    # every tag
+$ git remote set-url origin coffer::/mnt/usb/myproject.coffer   # make it the default
+```
+
+Everything on the old host, exactly as it is (all branches, tags, notes):
+
+```console
+$ git clone --mirror git@example.com:you/myproject.git
+$ git push --mirror coffer::/mnt/usb/myproject.coffer
+```
+
+From then on `git push`, `git pull`, and VSCode's Sync button talk to
+the vault; on another machine, `git clone
+coffer::/mnt/usb/myproject.coffer` is the whole story (Windows:
+`coffer::D:\backups\myproject.coffer`; macOS:
+`coffer::/Volumes/Backup/myproject.coffer`). Keep the old host as a
+second remote, or delete the repository there once you are comfortable —
+the vault and your passphrase reconstruct everything.
 
 ### The coffer CLI
 
@@ -179,7 +225,7 @@ The full analysis is in [docs/threat-model.md](docs/threat-model.md).
 
 ## Choosing an approach
 
-Encrypting git backups has three mature shapes, each fitting different
+Encrypting git backups has four mature shapes, each fitting different
 needs — the right choice is whatever matches yours:
 
 - **Encrypting individual files inside the repository** — the natural fit
@@ -188,6 +234,10 @@ needs — the right choice is whatever matches yours:
 - **An encrypted volume holding a bare repository** — natural when you
   already work with encrypted volumes and don't mind mounting one before
   every push.
+- **A general backup tool archiving the repository** (restic, Borg,
+  Kopia) — natural when one tool already backs up everything else on the
+  machine. Its artifact is an archive restored with that same tool;
+  Coffer's artifact is a remote you clone like any other.
 - **An encrypted remote helper** — the whole remote is ciphertext; `git
   push` stays a single step, on every platform, with no drivers or daemons.
 
@@ -195,6 +245,47 @@ Coffer lives in the third shape. Its design follows the path that
 [git-remote-gcrypt](https://github.com/spwhitton/git-remote-gcrypt) proved
 on Linux, and aims to offer it everywhere with no dependencies — we are
 grateful for the ground it broke.
+
+## How Coffer is tested
+
+Claims are cheap; here is what stands behind this one. Everything below
+is reproducible from this repository's CI logs, release archives, and
+documents.
+
+- **Every push runs the full suite** on Linux, Windows, and macOS: unit
+  tests; end-to-end runs against real git (clone, push, incremental
+  updates, forced overwrites, deletions, `--atomic`); crash injection —
+  the helper is killed mid-push and the vault must recover; and a
+  corruption matrix that mangles every part of the vault in turn and
+  requires a loud failure, never silent damage. On top of that: the race
+  detector, `govulncheck`, fuzz seeds for every on-media parser,
+  cross-compilation of all six release targets — and a dedicated leg
+  that builds **git 2.30.0 from source** and runs the entire suite
+  against it, so the supported floor is exercised on every push rather
+  than asserted.
+- **Independent review rounds.** Cold reviewers with no prior context
+  audited the cryptography, the Go application security, and the git
+  protocol and backup-integrity behavior; a macOS platform expert
+  audited the darwin-specific surface; each release candidate's diff got
+  its own adversarial review. Every finding became a fix with a
+  regression test before the next candidate.
+- **Seven release candidates, device-proven.** Each rc's release notes
+  say exactly what it fixed; from rc.4 on, every one was installed from
+  its published archives and pushed through the full functional
+  checklist on real external media — Windows (NTFS, exFAT, FAT32) and
+  Linux (FAT32, exFAT) — including cross-system relay, where one
+  operating system writes a vault and another reads it back. **v1.0.0 is
+  tagged at the exact commit rc.7 tested.**
+- **The format is pinned, not promised.** The on-disk format has a
+  normative specification and public AEAD test vectors, so an
+  independent implementation — or a future version — can verify a vault
+  byte-for-byte. And the exit path is built in: `gitcoffer export-bundle`
+  writes a plain git bundle any stock git can clone.
+
+Where the boundaries are — LFS content, metadata visibility, what a
+tampering medium-writer can and cannot do —
+[docs/threat-model.md](docs/threat-model.md) and
+[docs/support-matrix.md](docs/support-matrix.md) say so in plain text.
 
 ## Documentation
 
