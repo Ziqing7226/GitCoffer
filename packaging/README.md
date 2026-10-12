@@ -1,10 +1,8 @@
 # Packaging manifests
 
-Submission templates for the package stores. They target the stable
-1.0.0 tag; the `sha256`/`hash` fields are filled from that release's
-`checksums.txt` at submission time (the current placeholders are
-intentionally invalid — never ship a manifest with an unverified
-hash).
+Store manifests for the stable 1.0.0 release. The `sha256`/`hash`
+fields are filled from that release's `checksums.txt` (verified
+against the downloaded archives).
 
 | Store | Manifest | Destination |
 |---|---|---|

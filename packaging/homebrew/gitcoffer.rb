@@ -2,9 +2,7 @@ class Gitcoffer < Formula
   desc "Encrypted git remote that lives on your own disk"
   homepage "https://github.com/Ziqing7226/GitCoffer"
   url "https://github.com/Ziqing7226/GitCoffer/archive/refs/tags/v1.0.0.tar.gz"
-  # sha256 of the v1.0.0 source archive — filled from the tagged release
-  # at submission time (the placeholder is intentionally invalid).
-  sha256 "fill-in-when-v1.0.0-is-tagged"
+  sha256 "17dde536f214d5bdc907142a351064d8d69d8a01c502390c29b7e45e8f9f84b1"
   license "MIT"
 
   livecheck do
