@@ -57,23 +57,6 @@ operating systems and real external media
   rights. The vault is plain files, so exFAT and FAT32 media are fully
   supported.
 
-## The backup drive is the weakest link
-
-Self-hosted git platforms — Gitea, GitLab, Forgejo — keep repositories
-in plaintext on the server disk, and that is by design: the server reads
-them for every clone, diff, and search, and full-disk encryption covers
-the machine in the rack. The routine file copy to a portable drive for
-offsite backup is the different story. The moment it leaves the server,
-it is outside every one of those protections — and it is the one copy
-that travels in bags, moves between machines, and eventually gets lost.
-
-Coffer exists for exactly that copy: make the backup job a `git push`
-into a vault instead of a copy of plaintext, and the offsite drive holds
-nothing readable. Two honest boundaries: a vault stores git data —
-commits, branches, tags — not a forge's issues, wikis, or CI records
-(keep the platform's own dump for those), and it is one-way offsite
-storage, not a live server backend.
-
 ## How it works
 
 Git delegates transport for unknown URL schemes to a helper binary: a
@@ -124,8 +107,22 @@ $ go install github.com/Ziqing7226/GitCoffer/cmd/gitcoffer@v1.0.0
 $ go install github.com/Ziqing7226/GitCoffer/cmd/git-remote-coffer@v1.0.0
 ```
 
-Package-manager entries (Homebrew tap, scoop bucket, winget) are
-submitted alongside this release.
+**Package managers.** A Homebrew tap (macOS / Linux):
+
+```console
+$ brew tap Ziqing7226/gitcoffer
+$ brew install Ziqing7226/gitcoffer/gitcoffer
+```
+
+scoop (Windows):
+
+```powershell
+scoop bucket add ziqing7226 https://github.com/Ziqing7226/scoop-bucket
+scoop install gitcoffer
+```
+
+A winget entry (`winget install Ziqing7226.GitCoffer`) is in review and
+lands when the community repository accepts it.
 
 ## Quick start
 
@@ -150,7 +147,9 @@ configured credential helper (`--atomic` and `--force-with-lease` work as
 with any remote). On Windows:
 `git remote add origin coffer::D:\backups\myproject.coffer`; on macOS:
 `coffer::/Volumes/Backup/myproject.coffer`. To clone on another machine,
-only git, Coffer, and the passphrase are needed:
+only git, Coffer, and the passphrase are needed — and "another machine"
+includes another operating system: hand the drive to a colleague and
+they clone from it on Windows, Linux, or macOS with the passphrase.
 `git clone coffer::/mnt/usb/myproject.coffer`.
 
 ### Nicer remote URLs
@@ -225,7 +224,15 @@ The full analysis is in [docs/threat-model.md](docs/threat-model.md).
 
 ## Choosing an approach
 
-Encrypting git backups has four mature shapes, each fitting different
+Which copy actually needs encrypting? Servers — including self-hosted
+forges like Gitea and GitLab, which keep repositories in plaintext by
+design and cover the machine in the rack with full-disk encryption — are
+not the weak link. The weak link is the copy that leaves: the portable
+drive carried offsite, in bags, between machines, that eventually gets
+lost. Once it leaves the server, it is outside every one of those
+protections.
+
+Encrypting that copy has four mature shapes, each fitting different
 needs — the right choice is whatever matches yours:
 
 - **Encrypting individual files inside the repository** — the natural fit
@@ -239,9 +246,13 @@ needs — the right choice is whatever matches yours:
   machine. Its artifact is an archive restored with that same tool;
   Coffer's artifact is a remote you clone like any other.
 - **An encrypted remote helper** — the whole remote is ciphertext; `git
-  push` stays a single step, on every platform, with no drivers or daemons.
+  push` stays a single step, on every platform, with no drivers or
+  daemons. For the offsite copy, this turns the backup job itself into
+  `git push` — no plaintext copy is ever written. Two honest boundaries:
+  a vault stores git data (commits, branches, tags), not a forge's
+  issues, wikis, or CI records — keep the platform's own dump for those.
 
-Coffer lives in the third shape. Its design follows the path that
+Coffer lives in the fourth shape. Its design follows the path that
 [git-remote-gcrypt](https://github.com/spwhitton/git-remote-gcrypt) proved
 on Linux, and aims to offer it everywhere with no dependencies — we are
 grateful for the ground it broke.
@@ -250,7 +261,7 @@ grateful for the ground it broke.
 
 Claims are cheap; here is what stands behind this one. Everything below
 is reproducible from this repository's CI logs, release archives, and
-documents.
+documents — including what was *not* tested by hand.
 
 - **Every push runs the full suite** on Linux, Windows, and macOS: unit
   tests; end-to-end runs against real git (clone, push, incremental
@@ -263,19 +274,23 @@ documents.
   that builds **git 2.30.0 from source** and runs the entire suite
   against it, so the supported floor is exercised on every push rather
   than asserted.
-- **Independent review rounds.** Cold reviewers with no prior context
-  audited the cryptography, the Go application security, and the git
-  protocol and backup-integrity behavior; a macOS platform expert
-  audited the darwin-specific surface; each release candidate's diff got
-  its own adversarial review. Every finding became a fix with a
-  regression test before the next candidate.
-- **Seven release candidates, device-proven.** Each rc's release notes
-  say exactly what it fixed; from rc.4 on, every one was installed from
-  its published archives and pushed through the full functional
-  checklist on real external media — Windows (NTFS, exFAT, FAT32) and
-  Linux (FAT32, exFAT) — including cross-system relay, where one
-  operating system writes a vault and another reads it back. **v1.0.0 is
-  tagged at the exact commit rc.7 tested.**
+- **Review rounds.** The cryptography, the Go application security, and
+  the git protocol and backup-integrity behavior were each audited in
+  cold-start rounds by agent reviewers with no shared context, a
+  darwin-focused specialist pass covered the macOS surface, and each
+  release candidate's diff got its own adversarial review. Every
+  finding became a fix with a regression test before the next
+  candidate. These are agent-run reviews, not a paid third-party audit.
+- **Seven release candidates, device-tested where it counts.** Each
+  rc's release notes say exactly what it fixed; from rc.4 on, every one
+  was installed from its published archives and pushed through the full
+  functional checklist on real external media — Windows (NTFS, exFAT,
+  FAT32) and Linux (FAT32, exFAT) — including cross-system relay, where
+  one operating system writes a vault and another reads it back. macOS
+  was never hand-tested on Apple hardware: its coverage is the CI
+  macOS leg (the full suite, on every push) plus the specialist
+  darwin review — no device claims are made for it. **v1.0.0 carries
+  rc.7's code unchanged; only documentation differs.**
 - **The format is pinned, not promised.** The on-disk format has a
   normative specification and public AEAD test vectors, so an
   independent implementation — or a future version — can verify a vault

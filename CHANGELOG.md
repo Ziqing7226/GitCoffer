@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Documentation: the weakest-link scenario merged into "Choosing an
+  approach"; "How Coffer is tested" now states plainly that the review
+  rounds are agent-run (not a paid third-party audit) and that macOS
+  coverage is CI plus specialist review with no hand-testing on Apple
+  hardware; the install sections name the live Homebrew tap and scoop
+  bucket (winget in review); .gitignore gains coverage and log
+  artifacts.
+
 ## 1.0.0 (2026-10-12)
 
 - macOS review of the rc.3→rc.6 delta — all findings fixed: the

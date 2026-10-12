@@ -8,3 +8,8 @@
 # OS noise
 .DS_Store
 Thumbs.db
+
+# Local test and coverage artifacts
+/coverage.out
+/coverage.html
+*.log

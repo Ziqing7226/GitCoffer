@@ -57,8 +57,12 @@ $ go install github.com/Ziqing7226/GitCoffer/cmd/gitcoffer@v1.0.0
 $ go install github.com/Ziqing7226/GitCoffer/cmd/git-remote-coffer@v1.0.0
 ```
 
-Package-manager entries (Homebrew, scoop, winget) are submitted with this
-1.0.0 release.
+**Package managers.** Homebrew tap (macOS / Linux):
+`brew tap Ziqing7226/gitcoffer` then
+`brew install Ziqing7226/gitcoffer/gitcoffer`. scoop (Windows):
+`scoop bucket add ziqing7226 https://github.com/Ziqing7226/scoop-bucket`
+then `scoop install gitcoffer`. A winget entry
+(`winget install Ziqing7226.GitCoffer`) is in review.
 
 **Windows note:** add the install directory to `PATH` via system settings;
 no administrator rights are needed anywhere.
