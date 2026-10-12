@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- development.md: the maintainer named the 1.1.0 work plan — a
+  three-state vault check command, migratable key-file paths, gc
+  repacking, and the format-v2 manifest-generation AAD binding — and
+  declined the VSCode companion extension outright.
 - Documentation consistency round: architecture's CLI list includes
   `completion`; the user guide documents the key-file registered-path
   model (exact path required, copies do not unlock, moving the vault or

@@ -249,12 +249,29 @@ decision, not an omission:
   higher generation (rollback); today fsck's chain check exposes this,
   but authentication itself would reject it if the generation were part
   of the AAD. That is a format change and v1 is frozen.
-- VSCode companion extension, CI performance budgets, an ADR directory.
+- **Migratable key-file paths.** A key-file slot records the key file's
+  exact path; a future design may recognize the file by content (or a
+  relative convention) instead, so a vault survives moves between
+  machines and drive letters.
+
+## The 1.1.0 work plan (named by the maintainer, 2026-10-12)
+
+- **Vault check command** — a three-state probe in the style of
+  git-remote-gcrypt's `--check`: exit 0 = vault exists and opens with
+  the supplied passphrase; 1 = it is a vault but does not open (wrong
+  passphrase or damage); 100 = not a vault (or unreachable). For
+  backup scripts and tooling to branch on.
+- **Migratable key-file paths** (above).
+- **gc repacking** (above) — reclaims deleted history for real.
+- **Manifest generation bound into the AAD (format v2)** (above) —
+  turns rollback detection into rollback rejection, with a v1→v2
+  compatibility story.
 
 Deliberately declined: per-run CI performance budgets as failures
 (flaky), a formal ADR directory (decisions live in the spec and
-architecture notes), and a comparison page (replaced by the neutral
-"Choosing an approach").
+architecture notes), a comparison page (replaced by the neutral
+"Choosing an approach"), and a VSCode companion extension (the CLI
+already makes VSCode's Sync button work natively; 2026-10-12).
 
 ## Testing strategy
 
