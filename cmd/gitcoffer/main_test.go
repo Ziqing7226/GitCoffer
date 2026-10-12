@@ -201,3 +201,19 @@ func TestCompletionCoversEveryCommand(t *testing.T) {
 		t.Error("unknown shell accepted")
 	}
 }
+
+func TestFatMediaClassification(t *testing.T) {
+	for name, want := range map[string]bool{
+		// FAT family: the 4 GiB single-file cap matters.
+		"vfat": true, "msdos": true, "fat": true, "fat12": true,
+		"fat16": true, "fat32": true,
+		// Everything else, including spellings Windows reports.
+		"exfat": false, "ntfs": false, "ntfs3": false, "refs": false,
+		"ext4": false, "btrfs": false, "tmpfs": false, "xfs": false,
+		"apfs": false, "cifs": false, "unknown": false, "": false,
+	} {
+		if got := fatMedia(name); got != want {
+			t.Errorf("fatMedia(%q) = %v, want %v", name, got, want)
+		}
+	}
+}

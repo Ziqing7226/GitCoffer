@@ -2,6 +2,11 @@
 
 ## Unreleased (toward 1.0.0)
 
+- Windows: `gitcoffer doctor` now reports the filesystem (NTFS, exFAT,
+  FAT32, ...) and warns on FAT media like on Linux and macOS — the
+  filesystem line had never been implemented on Windows. rc.5's exFAT
+  fix note was Linux-side only: the corrected statfs magic does not
+  compile into Windows builds, and the note should have said so.
 - macOS: GUI-app PATH guidance (Dock-launched VSCode does not see
   ~/.local/bin), Gatekeeper quarantine recovery for browser downloads,
   a zsh completion that activates via eval on the default shell, bash

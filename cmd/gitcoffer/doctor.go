@@ -107,10 +107,10 @@ func doctorCmd(args []string) error {
 
 	// Media and leftover state.
 	if fsName, known := filesystemName(dir); known {
-		switch {
-		case fsName == "vfat" || fsName == "msdos":
+		fsName = strings.ToLower(fsName)
+		if fatMedia(fsName) {
 			d.warn("filesystem %s caps single files at 4 GiB; a single object file larger than that cannot be written", fsName)
-		default:
+		} else {
 			d.ok("filesystem %s", fsName)
 		}
 	}
@@ -164,6 +164,14 @@ func doctorCmd(args []string) error {
 	}
 	fmt.Println("doctor complete: no failures")
 	return nil
+}
+
+// fatMedia reports whether a (lowercase) filesystem name is a FAT
+// family whose 4 GiB single-file cap can reject vault object writes.
+// Platform probes report different spellings: vfat/msdos on Linux,
+// msdos on macOS, FAT/FAT12/FAT16/FAT32 on Windows.
+func fatMedia(fsName string) bool {
+	return fsName == "vfat" || fsName == "msdos" || strings.HasPrefix(fsName, "fat")
 }
 
 var gitVersionRe = regexp.MustCompile(`git version (\d+)\.(\d+)`)

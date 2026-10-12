@@ -12,7 +12,7 @@ git, crash injection, corruption matrix) on:
 | Axis | Coverage |
 |---|---|
 | OS | Linux (ubuntu-latest), Windows (windows-latest), macOS (macos-latest) |
-| Filesystems | ext4, NTFS, APFS (runner-native); FAT32 on real external USB media (local battery) |
+| Filesystems | ext4, NTFS, APFS (runner-native); FAT32 and exFAT on real external USB media (local battery) |
 | git | Current stable per runner image, plus a dedicated CI leg running the full suite against git 2.30.0 built from source — the supported floor is exercised on every push, not asserted |
 | Architectures | amd64 and arm64, built and cross-compiled on every push |
 
