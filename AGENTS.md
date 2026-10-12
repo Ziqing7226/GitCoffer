@@ -18,7 +18,9 @@ add/remove/list, rekey, gc report-only with --prune, fsck, doctor,
 export-bundle, version --json, completion), CI on Linux, Windows, and
 macOS plus a git 2.30 floor leg, three independent security review
 rounds complete, release workflow (six platforms) and packaging
-manifests under `packaging/`, and the user guide. docs/development.md tracks the release gate.
+manifests under `packaging/`, and the user guide. The Homebrew tap and scoop bucket are live; the
+winget entry is in community review. docs/development.md tracks the
+release gate.
 
 ## Iron Rule — English only
 

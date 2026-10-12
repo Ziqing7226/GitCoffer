@@ -196,6 +196,13 @@ a second factor; losing it locks out every slot that requires it.
   `printf 'protocol=coffer\nhost=coffer\npath=<vault id>\n\n' | git credential reject`
 - Share access with a collaborator or machine by adding a slot
   (`gitcoffer key add`) instead of sharing one passphrase.
+- A key-file slot records the key file's **exact path** and always reads
+  that path: a copy of the same file elsewhere does not unlock the slot,
+  and moving the vault or the key file to another machine (or another
+  drive letter) locks the slot until the file is back at the recorded
+  path — or a new slot is added with the file at its new location. Keep
+  key files on a stable path that exists on every machine that opens
+  the vault.
 
 **Recovering on a fresh machine:** install git and Coffer, mount the
 medium, `git clone coffer::<path>`, enter the passphrase. Keeping a copy
@@ -252,7 +259,7 @@ FAT32 file-size caps) are listed in
 | Push refused: the vault inventory has grown beyond the manifest limit | The vault index is capped at 8 MiB (roughly 150–200k stored objects) and rewrites wholesale on every push; very large repositories hit this ceiling. The vault is intact — see the support matrix's scale boundary. |
 | Push refused: non-fast-forward | The vault's branch would be overwritten by unrelated or rewritten history. Fetch and merge first; `--force` overwrites deliberately — the overwritten commits become unrecoverable after `gitcoffer gc --prune`. |
 | `another coffer operation is writing` | A concurrent writer holds the vault lock. On Windows, a crashed holder's lock is stolen as soon as its pid is detected dead; on any platform, if you are certain none is running you can delete `<vault>/vault.lock` directly. |
-| Clone of a non-`main` repository checks out an empty tree | Fixed in 1.0.0-pre: the alphabetically first branch is advertised as HEAD. Update both binaries. |
+| Clone of a non-`main` repository checks out an empty tree | Fixed long before 1.0.0: the alphabetically first branch is advertised as HEAD. If you still see this, update both binaries to the current release. |
 
 ## Security notes
 

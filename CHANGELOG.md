@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Documentation consistency round: architecture's CLI list includes
+  `completion`; the user guide documents the key-file registered-path
+  model (exact path required, copies do not unlock, moving the vault or
+  key file to another machine locks the slot); AGENTS states the tap
+  and bucket are live with winget in review; a stale troubleshooting
+  row reworded.
 - Documentation: the weakest-link scenario merged into "Choosing an
   approach"; "How Coffer is tested" now states plainly that the review
   rounds are agent-run (not a paid third-party audit) and that macOS
