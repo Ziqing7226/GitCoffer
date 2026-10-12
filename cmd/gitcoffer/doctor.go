@@ -81,13 +81,15 @@ func doctorCmd(args []string) error {
 			if sl.Input != "passphrase+keyfile" || sl.Keyfile == "" {
 				continue
 			}
-			// Sanitize before display; the containment-relevant path
-			// operations use the raw value.
-			path := sanitizePath(sl.Keyfile)
-			if !filepath.IsAbs(path) {
-				path = filepath.Join(dir, path)
+			// The presence probe reads the recorded path verbatim
+			// (control characters are legal file-name bytes); only the
+			// display is sanitized.
+			probe := sl.Keyfile
+			if !filepath.IsAbs(probe) {
+				probe = filepath.Join(dir, probe)
 			}
-			info, serr := os.Lstat(path)
+			info, serr := os.Lstat(probe)
+			path := sanitizePath(probe)
 			switch {
 			case serr != nil:
 				d.warn("slot %d key file missing: %s (that slot cannot open until restored)", sl.ID, path)

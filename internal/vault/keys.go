@@ -205,6 +205,23 @@ func ensureKeyfile(vaultDir, path string) (string, error) {
 	if rel, rerr := filepath.Rel(av, ap); rerr == nil && !strings.HasPrefix(rel, "..") {
 		return "", fmt.Errorf("key file %s is inside the vault directory — a second factor must live away from the medium it protects", abs)
 	}
+	// String comparison cannot see filesystem aliasing: on case-insensitive
+	// volumes (default APFS, exFAT/FAT media) the same directory answers
+	// to many spellings. Compare directory identity along the key file's
+	// existing ancestors — if any of them IS the vault directory, the key
+	// file is inside it whatever the spelling.
+	if vi, verr := os.Stat(av); verr == nil {
+		for p := ap; ; {
+			if pi, perr := os.Stat(p); perr == nil && os.SameFile(vi, pi) {
+				return "", fmt.Errorf("key file %s is inside the vault directory — a second factor must live away from the medium it protects", abs)
+			}
+			parent := filepath.Dir(p)
+			if parent == p {
+				break
+			}
+			p = parent
+		}
+	}
 	if info, err := os.Stat(abs); err == nil {
 		if info.Size() < minKeyfileSize {
 			return "", fmt.Errorf("key file %s holds only %d bytes — a second factor must carry real entropy (at least %d bytes)", abs, info.Size(), minKeyfileSize)

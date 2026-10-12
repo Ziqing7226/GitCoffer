@@ -2,6 +2,16 @@
 
 ## Unreleased (toward 1.0.0)
 
+- macOS review of the rc.3→rc.6 delta — all findings fixed: the
+  key-file containment check compares directory identity along the
+  recorded path, not just path spelling (on case-insensitive volumes —
+  default APFS, exFAT/FAT media — a differently-cased path could
+  previously place a second factor inside the vault it protects); the
+  zsh completion loads compinit itself when the stock shell has not
+  (the eval path previously printed "command not found: compdef" and
+  activated nothing there); doctor's key-file presence probe reads the
+  recorded path verbatim instead of its display-sanitized spelling;
+  fsck no longer counts Finder metadata junk in obj/ as orphans.
 - Windows: `gitcoffer doctor` now reports the filesystem (NTFS, exFAT,
   FAT32, ...) and warns on FAT media like on Linux and macOS — the
   filesystem line had never been implemented on Windows. rc.5's exFAT

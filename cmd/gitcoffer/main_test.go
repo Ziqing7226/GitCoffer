@@ -217,3 +217,15 @@ func TestFatMediaClassification(t *testing.T) {
 		}
 	}
 }
+
+func TestZshCompletionWorksWithoutCompinit(t *testing.T) {
+	// Stock macOS zsh never runs compinit on its own: the eval'd script
+	// must load the completion system before registering, or every
+	// shell start prints "command not found: compdef".
+	out := captureCompletion(t, "zsh")
+	for _, want := range []string{"funcstack[1]", "compinit", "compdef _gitcoffer gitcoffer"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("zsh completion lacks %q", want)
+		}
+	}
+}

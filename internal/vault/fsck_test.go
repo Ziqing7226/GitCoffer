@@ -133,3 +133,25 @@ func TestFsckOrphanIsInfo(t *testing.T) {
 		t.Fatalf("orphan not surfaced as hygiene info: %v", findings)
 	}
 }
+
+func TestFsckSilentAboutFinderJunk(t *testing.T) {
+	dir := t.TempDir()
+	storeWithObject(t, dir, "pass")
+	// Finder drops AppleDouble and .DS_Store files into obj/ on Mac-
+	// managed FAT/exFAT media; gc removes them, fsck must not count
+	// them as orphans on every run.
+	for _, junk := range []string{"._photo.jpeg", ".DS_Store"} {
+		if err := os.WriteFile(filepath.Join(dir, objDirName, junk), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	findings, err := Fsck(dir, "pass")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range findings {
+		if strings.Contains(f.Detail, "._") || strings.Contains(f.Detail, ".DS_Store") {
+			t.Fatalf("fsck reports Finder junk: %s", f)
+		}
+	}
+}

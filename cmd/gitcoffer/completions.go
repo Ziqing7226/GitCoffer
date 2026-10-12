@@ -67,10 +67,15 @@ _gitcoffer() {
 	esac
 }
 # Only run the completion when invoked by compinit's fpath mechanism;
-# when the script is eval'd, register it instead.
+# when the script is eval'd, register it instead — loading the
+# completion system first if the shell has not (stock macOS zsh never
+# runs compinit on its own).
 if [ "$funcstack[1]" = "_gitcoffer" ]; then
 	_gitcoffer "$@"
 else
+	if ! (( $+functions[compdef] )); then
+		autoload -Uz compinit && compinit
+	fi
 	compdef _gitcoffer gitcoffer
 fi
 `

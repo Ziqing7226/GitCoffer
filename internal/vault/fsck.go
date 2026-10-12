@@ -197,6 +197,11 @@ func Fsck(dir, passphrase string) ([]Finding, error) {
 				add("hygiene", fmt.Sprintf("obj/%s is a leftover temp file (gitcoffer gc removes it)", name), false)
 				continue
 			}
+			// Finder metadata on Mac-managed FAT/exFAT media is junk gc
+			// removes — not an orphan worth a hygiene line.
+			if strings.HasPrefix(e.Name(), "._") || e.Name() == ".DS_Store" {
+				continue
+			}
 			if !referenced[e.Name()] {
 				add("hygiene", fmt.Sprintf("obj/%s is referenced by no generation (gitcoffer gc removes it)", name), false)
 			}
