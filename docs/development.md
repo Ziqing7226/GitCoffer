@@ -273,6 +273,21 @@ damaging anything.
 - **Manifest generation bound into the AAD (format v2)** (above) —
   turns rollback detection into rollback rejection, with a v1→v2
   compatibility story.
+- **Brute-force resistance options, honestly scoped.** Guessing a
+  vault's passphrase is an OFFLINE attack: the attacker with the medium
+  runs their own tools against the sealed key slot, so no rate limiter
+  or lockout counter we ship can bind them — and a counter stored on
+  the medium can simply be rewound. The real defenses are per-guess
+  cost and passphrase entropy. Accordingly, two opt-in strengthenings:
+  (a) per-slot KDF cost selection at `key add`/`rekey` (within the
+  existing 1 GiB / t≤64 ceilings) — each Argon2id pass is the price of
+  every guess, forever; (b) an opt-in interactive-attempt backoff in
+  the CLI (progressive delay after failures), which by construction
+  only affects someone using GitCoffer itself — documented as anti-
+  casual, not anti-attacker. Toggling the backoff requires opening the
+  vault with the current passphrase, as the maintainer specified. No
+  lockout or self-destruct mechanisms: availability is not traded for
+  security theater.
 
 Deliberately declined: per-run CI performance budgets as failures
 (flaky), a formal ADR directory (decisions live in the spec and

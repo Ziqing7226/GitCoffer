@@ -129,6 +129,20 @@ $ printf "protocol=coffer\nhost=coffer\npath=<vault id>\nusername=coffer\npasswo
 The `<vault id>` is printed by `gitcoffer init` when the vault is
 created, and again in the header of `gitcoffer status`.
 
+**Why a push may ask for the passphrase twice.** git runs the helper in
+two separate stages — `list for-push` (read the vault's refs), then the
+actual `push` — and without a configured credential helper nothing is
+remembered between them, so both stages prompt. Configure one and you
+are asked once per window:
+
+```console
+$ git config --global credential.helper 'cache --timeout=3600'  # in-memory, 1 h
+$ git config --global credential.helper store                   # plaintext file
+```
+
+A `rekey` makes any cached passphrase stale — see the reject command
+above.
+
 (In PowerShell, pipe a double-quoted string with `` `n `` line breaks
 instead of printf.)
 
