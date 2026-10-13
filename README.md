@@ -225,7 +225,7 @@ the others on the disk — created alongside them, touching nothing.
 | `gitcoffer doctor <dir>` | check the environment and the vault |
 | `gitcoffer export-bundle <dir> <file>` | export the vault as a plain git bundle — the exit path |
 | `gitcoffer version [--json]` | print the build version (optionally as JSON) |
-| `gitcoffer completion <bash|zsh|fish|powershell>` | print a shell completion script |
+| `gitcoffer completion <shell>` | print a completion script for bash, zsh, fish, or powershell |
 
 Full walkthrough — keys and recovery, maintenance, troubleshooting:
 [docs/user-guide.md](docs/user-guide.md).
