@@ -315,6 +315,21 @@ damaging anything.
   vault with the current passphrase, as the maintainer specified. No
   lockout or self-destruct mechanisms: availability is not traded for
   security theater.
+- **Upstream auto-attach on the coffer remote** (candidate, from a
+  real-world v1.0.0 report: after re-pointing `origin` from GitHub to a
+  vault, `git pull` silently did nothing and VSCode showed "Publish
+  Branch" — no upstream tracking after the switch). After a fetch or
+  push, when the caller's current branch has no upstream anywhere and
+  the coffer remote has a branch of the same name, the helper attaches
+  it directly (`main` → `origin/main`) and prints what it did plus the
+  undo (`git branch --unset-upstream`). Guards, each with a reason:
+  current branch only — never under `--all` or `--mirror`, where
+  "same name exists" carries no intent; no existing upstream anywhere —
+  never steal tracking from another remote, which would silently
+  repoint a later plain `git pull` in the documented GitHub-plus-vault
+  dual-remote flow; exact name match; non-bare callers only; skip on
+  dry runs. When a guard fails, print the hint line without acting.
+  (2026-10-14)
 
 Deliberately declined: per-run CI performance budgets as failures
 (flaky), a formal ADR directory (decisions live in the spec and
