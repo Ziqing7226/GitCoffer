@@ -257,7 +257,8 @@ decision, not an omission:
 ## The 1.1.0 work plan (named by the maintainer, 2026-10-12)
 
 **Compatibility rule: upgrading to 1.1.0 must not change existing
-vaults.** The check command is read-only; key-file and repack changes
+vaults.** The check command is read-only; move relocates a vault
+without touching its contents; key-file and repack changes
 apply only when the user acts on a vault; format v2 exists only for
 new vaults or an explicit, per-vault migration — and a 1.0.0 binary
 refuses a v2 vault with the honest newer-version error rather than
@@ -270,9 +271,35 @@ damaging anything.
   backup scripts and tooling to branch on.
 - **Migratable key-file paths** (above).
 - **gc repacking** (above) — reclaims deleted history for real.
+- **Vault move command** — `gitcoffer move <vault> <new-path>` relocates
+  a vault directory and nothing more: GitHub↔vault relocations stay the
+  documented project-migration steps (plain git), and cloud targets are
+  ordinary mounted paths. During the move the source is never modified,
+  so the worst outcome is a cleaned-up partial target. Refusals: source
+  not a vault or actively locked; target non-empty, an existing vault,
+  or inside the source. Same-filesystem moves rename atomically;
+  cross-filesystem moves copy and verify (open + fsck) before reporting
+  success. The report prints the exact `git remote set-url` line for
+  existing clones, flags key-file slots whose registered path the move
+  invalidates, and warns when the target sits on a sync-client folder
+  (detected through the doctor fsname probe). After a successful copy
+  the command asks whether to remove the source vault; declining — or
+  a non-interactive run — keeps it as the natural backup. (2026-10-13)
 - **Manifest generation bound into the AAD (format v2)** (above) —
   turns rollback detection into rollback rejection, with a v1→v2
   compatibility story.
+- **Explicit v1→v2 migration, in place** — `gitcoffer migrate <vault>`
+  converts the vault to format v2 inside the same directory: fsck must
+  pass first, the writer lock is held throughout, only meta and
+  manifests are rewritten (v2 leaves packs unchanged) with the same
+  write-temp-and-rename atomicity rekey already uses, and the migrated
+  vault is reopened and verified before success is reported; an
+  interrupted run is resumed by running the command again. In place
+  means no doubled disk usage, no URL changes for clones, and no
+  leftover old vault to dispose of. The command warns about the one-way
+  door — older binaries refuse the migrated vault — before it acts.
+  `status` and `doctor` surface an available migration as a hint line;
+  nothing ever upgrades automatically. (2026-10-13)
 - **Brute-force resistance options, honestly scoped.** Guessing a
   vault's passphrase is an OFFLINE attack: the attacker with the medium
   runs their own tools against the sealed key slot, so no rate limiter
