@@ -48,7 +48,8 @@ operating systems and real external media
   hardware; the code contains no networking at all.
 - **Encrypted at rest.** The entire repository — objects, refs, history — is
   sealed under passphrase encryption (Argon2id key derivation,
-  XChaCha20-Poly1305 AEAD). Possessing the drive is not enough.
+  XChaCha20-Poly1305 AEAD — authenticated encryption, so a tampered byte
+  fails verification rather than decrypting). Possessing the drive is not enough.
 - **Stock git, unchanged.** Coffer is a standard
   [git remote helper](docs/architecture.md). No forked git, no wrappers to
   remember, no server to run. If `git push` works, Coffer works — and so does
@@ -98,7 +99,7 @@ Windows PowerShell has the equivalent `scripts/install.ps1`. On macOS,
 see the user guide's macOS notes for GUI-app PATH visibility and
 Gatekeeper. For shell
 completion, run `gitcoffer completion bash` (also `zsh`, `fish`,
-`powershell`) and load its output from your shell profile.
+`powershell`); the user guide shows the exact line to add for each shell.
 
 Or build from source with Go ≥ 1.27:
 
@@ -146,7 +147,11 @@ git's own credential flow — terminal prompt, native VSCode input box, or a
 configured credential helper (`--atomic` and `--force-with-lease` work as
 with any remote). On Windows:
 `git remote add origin coffer::D:\backups\myproject.coffer`; on macOS:
-`coffer::/Volumes/Backup/myproject.coffer`. To clone on another machine,
+`coffer::/Volumes/Backup/myproject.coffer`. On desktop Linux, a removable
+drive usually mounts under `/run/media/<you>/<drive-label>` — the
+`/mnt/usb` in these examples is a placeholder, and `/mnt` itself is
+root-owned; `lsblk` or `ls /run/media/$USER` lists the real mount points.
+To clone on another machine,
 only git, Coffer, and the passphrase are needed — and "another machine"
 includes another operating system: hand the drive to a colleague and
 they clone from it on Windows, Linux, or macOS with the passphrase.
@@ -154,10 +159,23 @@ they clone from it on Windows, Linux, or macOS with the passphrase.
 
 ### Nicer remote URLs
 
+Long vault paths — especially with spaces in them — make for clumsy
+remotes. Git has a built-in answer, URL rewriting: one config line tells
+git that any URL starting with `usb://` really means `coffer::` plus a
+vault directory, and from then on remotes can use the short form.
+
 ```console
 $ git config --global url."coffer::/mnt/usb/".insteadOf "usb://"
 $ git remote add origin usb://myproject.coffer
 ```
+
+The rule lives only in your git config — git rewrites the URL before
+every use, so `git push`, `git clone`, and VSCode all resolve
+`usb://myproject.coffer` to the vault behind it. Two things to know: the
+rule is per user and per machine, so a colleague cloning from the same
+drive needs the same line; and when the drive's mount path changes — a
+new drive letter on Windows, a new mount point on Linux — updating this
+one rule fixes every clone at once, with no `git remote set-url` rounds.
 
 ## Moving an existing project onto a vault
 

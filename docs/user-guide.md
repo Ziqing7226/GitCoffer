@@ -42,9 +42,7 @@ On Windows, the PowerShell installer
   `com.apple.quarantine` flag; first execution is blocked. Recover
   once: `xattr -d com.apple.quarantine <binary>` on both binaries, or
   allow via System Settings → Privacy & Security. The `curl`/`wget`
-  installer path adds no quarantine. For
-tab completion, load the script for your shell from your profile:
-`gitcoffer completion bash` (also `zsh`, `fish`, `powershell`).
+  installer path adds no quarantine.
 
 The version line is self-describing: release archives print the
 release version, `go install …@vX` prints that exact version, and a
@@ -67,11 +65,25 @@ then `scoop install gitcoffer`. A winget entry
 **Windows note:** add the install directory to `PATH` via system settings;
 no administrator rights are needed anywhere.
 
+**Shell completion.** `gitcoffer completion` prints a tab-completion
+script for four shells. Load it once — `gitcoffer` subcommands and flags
+then complete as you type:
+
+| Shell | One-time setup |
+|---|---|
+| bash | `eval "$(gitcoffer completion bash)"` in `~/.bashrc` |
+| zsh | `eval "$(gitcoffer completion zsh)"` in `~/.zshrc` — the script loads the completion system itself if the shell has not |
+| fish | `gitcoffer completion fish > ~/.config/fish/completions/gitcoffer.fish` |
+| PowerShell 7+ | `gitcoffer completion powershell >> $PROFILE` — native-command completion needs pwsh; Windows PowerShell 5.1 is not supported |
+
 ## Quick start
 
 Pick the vault path for your platform — Linux `/mnt/usb/…`,
 macOS `/Volumes/<volume>/…`, Windows `D:\backups\…` — and substitute it
-in the commands below (shown with the Linux path):
+in the commands below (shown with the Linux path). That Linux path is a
+placeholder: on desktop Linux a removable drive usually mounts under
+`/run/media/<you>/<drive-label>`, and `/mnt` itself is root-owned —
+`lsblk` or `ls /run/media/$USER` lists the real mount points:
 
 ```console
 $ gitcoffer init /mnt/usb/myproject.coffer
@@ -158,10 +170,23 @@ $ printf "protocol=coffer\nhost=coffer\npath=<vault id>\nusername=coffer\n\n" | 
 
 ### Nicer remote URLs
 
+Long vault paths — especially with spaces in them — make for clumsy
+remotes. Git has a built-in answer, URL rewriting: one config line tells
+git that any URL starting with `usb://` really means `coffer::` plus a
+vault directory, and from then on remotes can use the short form.
+
 ```console
 $ git config --global url."coffer::/mnt/usb/".insteadOf "usb://"
 $ git remote add origin usb://myproject.coffer
 ```
+
+The rule lives only in your git config — git rewrites the URL before
+every use, so every client resolves `usb://myproject.coffer` to the vault
+behind it. Two things to know: the rule is per user and per machine, so a
+colleague or a new machine needs the same line; and when the drive's
+mount path changes — a new drive letter on Windows, a new mount point on
+Linux — updating this one rule fixes every clone at once, with no
+`git remote set-url` rounds.
 
 ## How it works (one paragraph)
 
@@ -180,7 +205,7 @@ unchanged. The on-disk format is specified and frozen in
 | Command | Purpose |
 |---|---|
 | `gitcoffer init <dir>` | create a new vault (prompts for a new passphrase) |
-| `gitcoffer status <dir>` | inspect a vault: format, slots, refs, packs |
+| `gitcoffer status <dir>` | inspect a vault: format, key slots (passphrase / key-file entries), refs, packs |
 | `gitcoffer rekey <dir>` | change the passphrase of the slot it opens |
 | `gitcoffer key add [-keyfile <path>] <dir>` | add a passphrase slot, optionally requiring a key file as a second factor (the flag goes before the directory) |
 | `gitcoffer key remove <dir> <id>` | remove a key slot (never the last one) |
