@@ -103,8 +103,14 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${GITHUB_REF_NAME}"
+          # Versioning (docs/development.md): a.b.c — c > 0 is a release
+          # candidate and ships as a pre-release; c = 0 is a stable
+          # release. Legacy suffixed tags stay pre-releases too.
           case "$TAG" in
             *-pre*|*-rc*|*-beta*|*-alpha*) PRE="--prerelease" ;;
+            v[0-9]*.*.*)
+              C=$(echo "$TAG" | sed 's/^v//' | awk -F. '{print $3+0}')
+              [ "$C" -gt 0 ] && PRE="--prerelease" || PRE="" ;;
             *) PRE="" ;;
           esac
           gh release create "$TAG" \

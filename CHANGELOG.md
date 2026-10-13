@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Versioning convention: a.b.c with positive integers — a is the major
+  direction, b the minor direction (its goals are written down before
+  work starts), c the rc counter of the current direction; candidates
+  (c > 0) ship as pre-releases, stables (c = 0) as full releases. The
+  contract lives in CONTRIBUTING.md and the release workflow now marks
+  c > 0 tags as pre-releases.
+- README: a second screenshot set — "From GitHub to a vault", placed
+  with the migration how-to — a single maximized-terminal session against a real
+  GitHub-cloned repository (the session starts at git remote -v
+  showing the GitHub origin): gitcoffer init, the set-url that moves
+  origin to the vault, a push with the helper's own progress lines,
+  then the vault on disk — a plain folder, and a file manager
+  showing git.coffer among the drive's other folders. Captured with
+  editor AI features disabled and an English locale.
 - README: an "Inside VSCode" section shows the native-editor experience
   — publish, the passphrase prompt, in-sync state, and the built-in
   commit graph — as four screenshots taken against a real vault on a

@@ -316,6 +316,14 @@ already makes VSCode's Sync button work natively; 2026-10-12).
   the ones in the CI runs for that release tag — public, never asserted by
   hand.
 
+## Versioning
+
+The version scheme — three positive integers a.b.c, rc candidates as
+pre-releases, stables as full releases, and what each field means — is
+a contributor contract and lives in
+[CONTRIBUTING.md](../CONTRIBUTING.md#versioning). The next stable under
+it is 1.1.0; its minor-direction goals are the work plan above.
+
 ## Conventions
 
 - All artifacts in English — see CONTRIBUTING.md; reviews treat it as a

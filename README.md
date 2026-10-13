@@ -188,6 +188,30 @@ coffer::/mnt/usb/myproject.coffer` is the whole story (Windows:
 second remote, or delete the repository there once you are comfortable —
 the vault and your passphrase reconstruct everything.
 
+### From GitHub to a vault
+
+The steps above, done for real in the editor: the terminal below is
+one continuous session against a repository cloned from GitHub (this
+is
+[event-based_vision_resources](https://github.com/uzh-rpg/event-based_vision_resources)
+by UZH's Robotics and Perception Group — thank you for the public
+work): create the vault, move `origin` over with one `set-url`, push —
+and then look at the drive. The vault is a plain folder sitting next to
+the other files; nothing else on the disk changed.
+
+<img src="docs/assets/vscode-migration.png" width="800" alt="One terminal session in VSCode: git remote -v against GitHub, gitcoffer init, remote set-url from GitHub to the vault, push with the helper's progress lines">
+
+One frame, the whole story — top to bottom: `git remote -v` against
+GitHub (where the clone came from), `gitcoffer init` creating the
+vault (passphrase prompts, format v1), one `git remote set-url`
+moving `origin` to the vault, a push whose helper lines report 4,520
+objects stored in 557 ms and `master -> master`.
+
+And the drive agrees with the terminal: the vault is one folder among
+the others on the disk — created alongside them, touching nothing.
+
+<img src="docs/assets/vscode-folder-files.png" width="800" alt="GNOME Files showing git.coffer among the other folders on the USB drive">
+
 ### The coffer CLI
 
 | Command | Purpose |
