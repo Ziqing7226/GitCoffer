@@ -168,6 +168,10 @@ $ git push vault --tags    # every tag
 $ git remote set-url origin coffer::/mnt/usb/myproject.coffer   # make it the default
 ```
 
+The last line makes the vault your default. To keep using both, skip it:
+`git push` goes to GitHub, `git push vault` goes to the vault — share on
+GitHub, back up to the vault, from the same clone.
+
 Everything on the old host, exactly as it is (all branches, tags, notes):
 
 ```console
@@ -176,9 +180,22 @@ $ git push --mirror coffer::/mnt/usb/myproject.coffer
 ```
 
 From then on, pushes go to the vault; cloning on another machine is one
-command ([Quick start](#quick-start)). Keep the old host as a second
-remote, or delete it once you are comfortable — the vault plus the
-passphrase restores everything.
+command ([Quick start](#quick-start)). Delete the old repository once
+you are comfortable — the vault plus the passphrase restores everything.
+
+### If pull does nothing after the switch
+
+After you point `origin` at the vault, `git pull` may do nothing and
+VSCode may show "Publish Branch" again. Standard git, not a Coffer
+fault: the branch still tracks the old remote. Fix it once:
+
+```console
+$ git fetch origin
+$ git branch --set-upstream-to=origin/main main   # use your branch name
+```
+
+Branch names that differ, and the full story, are in the
+[user guide's troubleshooting table](docs/user-guide.md#troubleshooting).
 
 ### From GitHub to a vault
 
@@ -210,6 +227,10 @@ On the drive: one new folder. Nothing else changed.
 | `gitcoffer export-bundle <dir> <file>` | export the vault as a plain git bundle — the exit path |
 | `gitcoffer version [--json]` | print the build version (optionally as JSON) |
 | `gitcoffer completion <shell>` | print a completion script for bash, zsh, fish, or powershell |
+
+Please run `gitcoffer fsck` on your vault from time to time — after a
+big push, or once a month. It checks every seal and the manifest chain,
+so a failing medium is caught early, while recovery is still easy.
 
 Full walkthrough — keys and recovery, maintenance, troubleshooting:
 [docs/user-guide.md](docs/user-guide.md).

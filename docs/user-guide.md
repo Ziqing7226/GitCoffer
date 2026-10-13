@@ -272,7 +272,9 @@ FAT32 file-size caps) are listed in
 ## Maintenance
 
 - `gitcoffer fsck` verifies every AEAD seal, the manifest chain, and every
-  object's checksum; run it when a medium had a rough day. It reports the
+  object's checksum; run it when a medium had a rough day — and on a
+  schedule anyway: after big pushes, or once a month, to catch a failing
+  medium early. It reports the
   first divergence per structure and never attempts recovery. When it
   reports an unreadable manifest generation, re-push from the original
   repository anything that was acknowledged just before the failure —
@@ -305,6 +307,7 @@ FAT32 file-size caps) are listed in
 | Push refused: newest manifest generation unreadable | The newest vault index is damaged; an older state is being served. Run `gitcoffer fsck`, then simply push again — the damaged generation is quarantined automatically. Re-push from the original repository anything that reported ok just before the failure (gc --prune would otherwise reclaim it). |
 | Push refused: the vault inventory has grown beyond the manifest limit | The vault index is capped at 8 MiB (roughly 150–200k stored objects) and rewrites wholesale on every push; very large repositories hit this ceiling. The vault is intact — see the support matrix's scale boundary. |
 | Push refused: non-fast-forward | The vault's branch would be overwritten by unrelated or rewritten history. Fetch and merge first; `--force` overwrites deliberately — the overwritten commits become unrecoverable after `gitcoffer gc --prune`. |
+| `git pull` does nothing after `origin` was switched to the vault; VSCode shows "Publish Branch" | The branch still tracks the old remote — standard git behavior, not a helper fault. Run `git fetch origin`, then `git branch --set-upstream-to=origin/<branch> <branch>`. If the local branch name differs from the vault's, `git checkout -B <vault-branch> origin/<vault-branch>` instead. |
 | `another coffer operation is writing` | A concurrent writer holds the vault lock. On Windows, a crashed holder's lock is stolen as soon as its pid is detected dead; on any platform, if you are certain none is running you can delete `<vault>/vault.lock` directly. |
 | Clone of a non-`main` repository checks out an empty tree | Fixed long before 1.0.0: the alphabetically first branch is advertised as HEAD. If you still see this, update both binaries to the current release. |
 
