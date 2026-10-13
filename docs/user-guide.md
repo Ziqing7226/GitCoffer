@@ -29,6 +29,14 @@ $ git-remote-coffer          # run with no arguments, prints its usage note;
 On Windows, the PowerShell installer
 (`scripts/install.ps1`) does the same through `Invoke-WebRequest`.
 
+**Or install with the script** (Linux/macOS): downloads the latest
+release, verifies the checksum, installs into `~/.local/bin` — see the
+script header for options:
+
+```console
+$ curl -fsSL https://raw.githubusercontent.com/Ziqing7226/GitCoffer/main/scripts/install.sh | sh
+```
+
 **On macOS**, two platform specifics:
 
 - **Terminal vs GUI apps.** VSCode launched from the Dock inherits

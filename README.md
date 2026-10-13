@@ -24,18 +24,16 @@
 
 ---
 
-Coffer turns any directory on a removable or secondary disk into a fully
-encrypted git remote. `git push` works exactly the way it always has — but
-the bytes that reach the disk are ciphertext. Whoever finds the drive finds
-random-looking files; with the passphrase, the complete repository — every
-branch, tag, and commit — is reconstructed from the vault alone.
+Coffer turns any folder on a removable or second disk into an encrypted
+git remote. `git push` works as always — but what reaches the disk is
+encrypted. Without the passphrase, the files are noise. With it, the
+whole repository — every branch, tag, and commit — is restored from the
+vault alone.
 
-Vault format v1 is frozen and pinned by published
-[test vectors](docs/test-vectors.json). This is the **1.0.0** stable
-release — the format the release candidates have been writing all
-along, after seven release candidates of fix-and-reverify across three
-operating systems and real external media
-([how Coffer is tested](#how-coffer-is-tested)).
+This is the stable **1.0.0** release, tested across three operating
+systems and real drives ([how Coffer is tested](#how-coffer-is-tested)).
+The vault format is public and fixed, pinned by
+[test vectors](docs/test-vectors.json).
 
 ## Why
 
@@ -43,87 +41,55 @@ operating systems and real external media
   <img src="docs/assets/why-coffer.png" alt="A vault at the center, surrounded by: no third party, single static binary, cross-platform, native git clients" width="560">
 </p>
 
-- **No third party.** The remote is a directory you control — a USB stick,
-  an external drive, a second internal disk. Nothing ever leaves your
-  hardware; the code contains no networking at all.
-- **Encrypted at rest.** The entire repository — objects, refs, history — is
-  sealed under passphrase encryption (Argon2id key derivation,
-  XChaCha20-Poly1305 AEAD — authenticated encryption, so a tampered byte
-  fails verification rather than decrypting). Possessing the drive is not enough.
+- **No third party.** The remote is a folder you control — a USB stick,
+  an external drive, a second disk. Nothing leaves your hardware; the
+  code has no networking.
+- **Encrypted at rest.** Everything is encrypted under your passphrase
+  (Argon2id and XChaCha20-Poly1305). A changed byte fails the check, so
+  damage cannot hide. Without the passphrase, the drive holds noise,
+  not code.
 - **Stock git, unchanged.** Coffer is a standard
-  [git remote helper](docs/architecture.md). No forked git, no wrappers to
-  remember, no server to run. If `git push` works, Coffer works — and so does
+  [git remote helper](docs/architecture.md). No special git, no
+  wrappers, no server. If `git push` works, Coffer works — and so does
   the VSCode Sync button.
-- **Single static binary.** No GPG, no FUSE, no drivers, no administrator
-  rights. The vault is plain files, so exFAT and FAT32 media are fully
-  supported.
-
-## How it works
-
-Git delegates transport for unknown URL schemes to a helper binary: a
-`coffer::<path>` remote makes git invoke `git-remote-coffer`. On push, the
-helper reads the objects straight from your repository, encrypts them, and
-writes them into the vault; on fetch it does the reverse, importing
-decrypted objects back into your object database. Git never notices the
-difference — which is why every git client stays compatible. Requirements:
-stock git ≥ 2.30 (where the helper `object-format` capability first
-appeared) and the two GitCoffer binaries on `PATH`. The design and its
-rationale are in [docs/architecture.md](docs/architecture.md); the on-disk
-layout is normative in [docs/format-spec.md](docs/format-spec.md).
+- **Single static binary.** No GPG, no FUSE, no drivers, no
+  administrator rights. The vault is plain files, so exFAT and FAT32
+  drives work fully.
 
 ## Install
 
-Download a release for your platform — Linux, Windows, macOS, amd64 or
-arm64 — from the [releases page](https://github.com/Ziqing7226/GitCoffer/releases),
-unpack, and put both `gitcoffer` and `git-remote-coffer` on `PATH` (git finds
-the helper through `PATH`; no administrator rights needed). Verify:
+You need git 2.30 or newer and the two GitCoffer binaries, `gitcoffer`
+and `git-remote-coffer`, on `PATH`.
 
-```console
-$ gitcoffer version
-gitcoffer v1.0.0
-```
-
-The version line is self-describing: release archives print the
-release version, `go install …@vX` prints that exact version, and a
-build from the repository reports the commit it was built from.
-
-Or install with the script (downloads the latest release, verifies the
-checksum, installs into `~/.local/bin` — see the script header for
-options):
-
-```console
-$ curl -fsSL https://raw.githubusercontent.com/Ziqing7226/GitCoffer/main/scripts/install.sh | sh
-```
-
-Windows PowerShell has the equivalent `scripts/install.ps1`. On macOS,
-see the user guide's macOS notes for GUI-app PATH visibility and
-Gatekeeper. For shell
-completion, run `gitcoffer completion bash` (also `zsh`, `fish`,
-`powershell`); the user guide shows the exact line to add for each shell.
-
-Or build from source with Go ≥ 1.27:
-
-```console
-$ go install github.com/Ziqing7226/GitCoffer/cmd/gitcoffer@v1.0.0
-$ go install github.com/Ziqing7226/GitCoffer/cmd/git-remote-coffer@v1.0.0
-```
-
-**Package managers.** A Homebrew tap (macOS / Linux):
+With a package manager (macOS / Linux):
 
 ```console
 $ brew tap Ziqing7226/gitcoffer
 $ brew install Ziqing7226/gitcoffer/gitcoffer
 ```
 
-scoop (Windows):
+With scoop (Windows):
 
 ```powershell
 scoop bucket add ziqing7226 https://github.com/Ziqing7226/scoop-bucket
 scoop install gitcoffer
 ```
 
-A winget entry (`winget install Ziqing7226.GitCoffer`) is in review and
-lands when the community repository accepts it.
+A winget entry (`winget install Ziqing7226.GitCoffer`) is in review.
+
+Or download a release — Linux, Windows, macOS, amd64 or arm64 — from
+the [releases page](https://github.com/Ziqing7226/GitCoffer/releases),
+unpack, and put both binaries on `PATH` (no administrator rights
+needed). Verify:
+
+```console
+$ gitcoffer version
+gitcoffer v1.0.0
+```
+
+The install script, the PowerShell installer, building from source,
+shell completion, and the macOS notes (Dock-launched apps, Gatekeeper)
+are in the [user guide's Install section](docs/user-guide.md#install).
 
 ## Quick start
 
@@ -141,41 +107,52 @@ To coffer::/mnt/usb/myproject.coffer
  * [new branch]      main -> main
 ```
 
-From then on, `git pull`, `git fetch`, `git clone`, and VSCode's Sync
-button all work against the vault. The passphrase is requested through
-git's own credential flow — terminal prompt, native VSCode input box, or a
-configured credential helper (`--atomic` and `--force-with-lease` work as
-with any remote). On Windows:
-`git remote add origin coffer::D:\backups\myproject.coffer`; on macOS:
-`coffer::/Volumes/Backup/myproject.coffer`. On desktop Linux, a removable
-drive usually mounts under `/run/media/<you>/<drive-label>` — the
-`/mnt/usb` in these examples is a placeholder, and `/mnt` itself is
-root-owned; `lsblk` or `ls /run/media/$USER` lists the real mount points.
-To clone on another machine,
-only git, Coffer, and the passphrase are needed — and "another machine"
-includes another operating system: hand the drive to a colleague and
-they clone from it on Windows, Linux, or macOS with the passphrase.
-`git clone coffer::/mnt/usb/myproject.coffer`.
+From then on, `git pull`, `git fetch`, and VSCode's Sync button work
+against the vault. Git asks for the passphrase the usual way: in the
+terminal, in VSCode's input box, or through a credential helper.
+
+The vault path depends on where your drive lives:
+
+- Linux: `/mnt/usb` in these examples is a placeholder. Desktop Linux
+  mounts removable drives under `/run/media/<you>/<drive-label>` —
+  `lsblk` shows yours.
+- Windows: `git remote add origin coffer::D:\backups\myproject.coffer`
+- macOS: `git remote add origin coffer::/Volumes/Backup/myproject.coffer`
+
+Cloning on another machine needs three things: git, Coffer, and the
+passphrase. That machine can even run a different system — hand the
+drive to a colleague, and they clone it on Windows, Linux, or macOS:
+
+```console
+$ git clone coffer::/mnt/usb/myproject.coffer
+```
 
 ### Nicer remote URLs
 
-Long vault paths — especially with spaces in them — make for clumsy
-remotes. Git has a built-in answer, URL rewriting: one config line tells
-git that any URL starting with `usb://` really means `coffer::` plus a
-vault directory, and from then on remotes can use the short form.
+Vault paths get long. Git can rewrite them: one line tells git that
+every URL starting with `usb://` means `coffer::` plus this folder —
+your remotes stay short:
 
 ```console
 $ git config --global url."coffer::/mnt/usb/".insteadOf "usb://"
 $ git remote add origin usb://myproject.coffer
 ```
 
-The rule lives only in your git config — git rewrites the URL before
-every use, so `git push`, `git clone`, and VSCode all resolve
-`usb://myproject.coffer` to the vault behind it. Two things to know: the
-rule is per user and per machine, so a colleague cloning from the same
-drive needs the same line; and when the drive's mount path changes — a
-new drive letter on Windows, a new mount point on Linux — updating this
-one rule fixes every clone at once, with no `git remote set-url` rounds.
+Git applies the rule on every use. Two notes: the rule lives on each
+machine, so a colleague needs the same line; and when the drive's path
+changes (a new drive letter, a new mount point), you update this one
+line instead of every clone.
+
+## How it works
+
+When git sees a remote like `coffer::/mnt/usb/myproject.coffer`, it runs
+a small helper program, `git-remote-coffer`. On push, the helper
+encrypts your objects and writes them into the vault. On fetch, it
+decrypts them back. Git never sees the difference — so every git client
+works, including VSCode.
+
+The design is described in [docs/architecture.md](docs/architecture.md);
+the vault layout is specified in [docs/format-spec.md](docs/format-spec.md).
 
 ## Moving an existing project onto a vault
 
@@ -198,39 +175,28 @@ $ git clone --mirror git@example.com:you/myproject.git
 $ git push --mirror coffer::/mnt/usb/myproject.coffer
 ```
 
-From then on `git push`, `git pull`, and VSCode's Sync button talk to
-the vault; on another machine, `git clone
-coffer::/mnt/usb/myproject.coffer` is the whole story (Windows:
-`coffer::D:\backups\myproject.coffer`; macOS:
-`coffer::/Volumes/Backup/myproject.coffer`). Keep the old host as a
-second remote, or delete the repository there once you are comfortable —
-the vault and your passphrase reconstruct everything.
+From then on, pushes go to the vault; cloning on another machine is one
+command ([Quick start](#quick-start)). Keep the old host as a second
+remote, or delete it once you are comfortable — the vault plus the
+passphrase restores everything.
 
 ### From GitHub to a vault
 
-The steps above, done for real in the editor: the terminal below is
-one continuous session against a repository cloned from GitHub (this
-is
+The same steps, done for real inside the editor. One terminal session
+against a repository cloned from GitHub —
 [event-based_vision_resources](https://github.com/uzh-rpg/event-based_vision_resources)
-by UZH's Robotics and Perception Group — thank you for the public
-work): create the vault, move `origin` over with one `set-url`, push —
-and then look at the drive. The vault is a plain folder sitting next to
-the other files; nothing else on the disk changed.
+by UZH's Robotics and Perception Group, thank you for the public work:
 
 <img src="docs/assets/vscode-migration.png" width="800" alt="One terminal session in VSCode: git remote -v against GitHub, gitcoffer init, remote set-url from GitHub to the vault, push with the helper's progress lines">
 
-One frame, the whole story — top to bottom: `git remote -v` against
-GitHub (where the clone came from), `gitcoffer init` creating the
-vault (passphrase prompts, format v1), one `git remote set-url`
-moving `origin` to the vault, a push whose helper lines report 4,520
-objects stored in 557 ms and `master -> master`.
+Top to bottom: `git remote -v` against GitHub, `gitcoffer init`, one
+`set-url` moving `origin`, a push — 4,520 objects in 557 ms.
 
-And the drive agrees with the terminal: the vault is one folder among
-the others on the disk — created alongside them, touching nothing.
+On the drive: one new folder. Nothing else changed.
 
 <img src="docs/assets/vscode-folder-files.png" width="800" alt="GNOME Files showing git.coffer among the other folders on the USB drive">
 
-### The coffer CLI
+## The coffer CLI
 
 | Command | Purpose |
 |---|---|
@@ -250,12 +216,11 @@ Full walkthrough — keys and recovery, maintenance, troubleshooting:
 
 ## Inside VSCode
 
-Nothing new to learn: the vault is a remote, so the editor's built-in
-git tooling behaves exactly as it does with any host. Publishing asks
-for the passphrase once, through git's own native prompt — after that,
-Sync, the incoming/outgoing counters, and the commit graph all read
-from the encrypted vault on your disk. These screenshots show a real
-vault on a USB drive, pushed from the editor itself:
+Nothing new to learn: the vault is just a remote. Publishing asks for
+the passphrase once, through git's own prompt; after that, Sync, the
+incoming/outgoing counters, and the commit graph read from the
+encrypted vault. These screenshots show a real vault on a USB drive,
+pushed from the editor itself:
 
 <table>
   <tr>
@@ -290,91 +255,59 @@ Coffer protects **repository data at rest on the remote medium**.
 
 | In scope | Out of scope |
 |---|---|
-| Lost, stolen, copied, or forensically imaged drives | A host compromised *while* the vault is in use |
-| Failure of the original working disk — the vault is a complete backup | A forgotten passphrase — there is no recovery, by design |
-| Bit-rot and tampering with vault files (AEAD-verified) | Hiding vault metadata such as file count and approximate sizes |
+| Lost, stolen, or bit-by-bit copied drives | A host compromised *while* the vault is in use |
+| Failure of the working disk — the vault is a complete backup | A forgotten passphrase — there is no recovery, by design |
+| Damaged or tampered vault files — every file is verified | Hiding vault metadata, such as file count and approximate sizes |
 
 The full analysis is in [docs/threat-model.md](docs/threat-model.md).
 
 ## Choosing an approach
 
-Which copy actually needs encrypting? Servers — including self-hosted
-forges like Gitea and GitLab, which keep repositories in plaintext by
-design and cover the machine in the rack with full-disk encryption — are
-not the weak link. The weak link is the copy that leaves: the portable
-drive carried offsite, in bags, between machines, that eventually gets
-lost. Once it leaves the server, it is outside every one of those
-protections.
+Which copy needs encrypting? Usually not the server — it sits in a
+protected rack. The weak copy is the one that leaves your machine: the
+portable drive that travels in bags and one day gets lost.
 
-Encrypting that copy has four mature shapes, each fitting different
-needs — the right choice is whatever matches yours:
+Four good ways exist to protect that copy:
 
-- **Encrypting individual files inside the repository** — the natural fit
-  when the remote host must stay readable, for example while collaborating
-  through a public git host.
-- **An encrypted volume holding a bare repository** — natural when you
-  already work with encrypted volumes and don't mind mounting one before
-  every push.
-- **A general backup tool archiving the repository** (restic, Borg,
-  Kopia) — natural when one tool already backs up everything else on the
-  machine. Its artifact is an archive restored with that same tool;
-  Coffer's artifact is a remote you clone like any other.
-- **An encrypted remote helper** — the whole remote is ciphertext; `git
-  push` stays a single step, on every platform, with no drivers or
-  daemons. For the offsite copy, this turns the backup job itself into
-  `git push` — no plaintext copy is ever written. Two honest boundaries:
-  a vault stores git data (commits, branches, tags), not a forge's
-  issues, wikis, or CI records — keep the platform's own dump for those.
+- Encrypt single files inside the repository
+- Put a bare repository on an encrypted volume
+- Archive the repository with a backup tool (restic, Borg, Kopia)
+- **Use an encrypted remote helper** — the whole remote is encrypted,
+  `git push` stays one step on every platform, nothing to mount or run.
+  This is Coffer.
 
-Coffer lives in the fourth shape. Its design follows the path that
-[git-remote-gcrypt](https://github.com/spwhitton/git-remote-gcrypt) proved
-on Linux, and aims to offer it everywhere with no dependencies — we are
-grateful for the ground it broke.
+When each fits, and Coffer's honest limits, are set out in
+[docs/choosing-an-approach.md](docs/choosing-an-approach.md).
 
 ## How Coffer is tested
 
-Claims are cheap; here is what stands behind this one. Everything below
-is reproducible from this repository's CI logs, release archives, and
-documents — including what was *not* tested by hand.
+Claims are cheap. Everything below can be checked from this
+repository's CI logs and release archives — including what was *not*
+tested by hand.
 
-- **Every push runs the full suite** on Linux, Windows, and macOS: unit
-  tests; end-to-end runs against real git (clone, push, incremental
-  updates, forced overwrites, deletions, `--atomic`); crash injection —
-  the helper is killed mid-push and the vault must recover; and a
-  corruption matrix that mangles every part of the vault in turn and
-  requires a loud failure, never silent damage. On top of that: the race
-  detector, `govulncheck`, fuzz seeds for every on-media parser,
-  cross-compilation of all six release targets — and a dedicated leg
-  that builds **git 2.30.0 from source** and runs the entire suite
-  against it, so the supported floor is exercised on every push rather
-  than asserted.
-- **Review rounds.** The cryptography, the Go application security, and
-  the git protocol and backup-integrity behavior were each audited in
-  cold-start rounds by agent reviewers with no shared context, a
-  darwin-focused specialist pass covered the macOS surface, and each
-  release candidate's diff got its own adversarial review. Every
-  finding became a fix with a regression test before the next
-  candidate. These are agent-run reviews, not a paid third-party audit.
-- **Seven release candidates, device-tested where it counts.** Each
-  rc's release notes say exactly what it fixed; from rc.4 on, every one
-  was installed from its published archives and pushed through the full
-  functional checklist on real external media — Windows (NTFS, exFAT,
-  FAT32) and Linux (FAT32, exFAT) — including cross-system relay, where
-  one operating system writes a vault and another reads it back. macOS
-  was never hand-tested on Apple hardware: its coverage is the CI
-  macOS leg (the full suite, on every push) plus the specialist
-  darwin review — no device claims are made for it. **v1.0.0 carries
-  rc.7's code unchanged; only documentation differs.**
-- **The format is pinned, not promised.** The on-disk format has a
-  normative specification and public AEAD test vectors, so an
-  independent implementation — or a future version — can verify a vault
-  byte-for-byte. And the exit path is built in: `gitcoffer export-bundle`
-  writes a plain git bundle any stock git can clone.
+- **Every change runs the full test suite** on Linux, Windows, and
+  macOS. The tests push and clone with real git, kill the helper
+  mid-push and require the vault to recover, and corrupt vault files
+  on purpose to prove the failure is loud — never silent.
+- **Seven release candidates were tested on real drives.** From rc.4
+  on, each was installed from its published archive and run through
+  the full checklist on Windows (NTFS, exFAT, FAT32) and Linux
+  (FAT32, exFAT) media — including one system writing a vault and
+  another reading it back. macOS was never hand-tested on Apple
+  hardware: CI plus a specialist review, no device claims. **v1.0.0
+  carries rc.7's code unchanged; only documentation differs.**
+- **Independent review rounds** covered the cryptography, the Go
+  security, and the git protocol and backup behavior. Every finding
+  became a fix with a test. These are agent-run reviews, not a paid
+  third-party audit.
+- **The format is pinned, not promised**: a written specification and
+  public [test vectors](docs/test-vectors.json) let any implementation
+  check a vault byte-for-byte. `gitcoffer export-bundle` writes a
+  plain git bundle — the exit path is built in.
 
-Where the boundaries are — LFS content, metadata visibility, what a
-tampering medium-writer can and cannot do —
-[docs/threat-model.md](docs/threat-model.md) and
-[docs/support-matrix.md](docs/support-matrix.md) say so in plain text.
+Boundaries — LFS content, visible metadata, tampering — are stated in
+the [threat model](docs/threat-model.md) and the
+[support matrix](docs/support-matrix.md).
 
 ## Documentation
 
@@ -385,6 +318,7 @@ tampering medium-writer can and cannot do —
 | [Vault format specification](docs/format-spec.md) | normative on-disk format — build against this |
 | [Support matrix](docs/support-matrix.md) | tested configurations and explicit boundaries |
 | [Threat model](docs/threat-model.md) | what Coffer does and does not protect |
+| [Choosing an approach](docs/choosing-an-approach.md) | the four ways to encrypt an offsite copy, and when each fits |
 | [Development plan](docs/development.md) | stack, phases, testing strategy, conventions |
 | [Contributing](CONTRIBUTING.md) | repository rules and how to contribute |
 
