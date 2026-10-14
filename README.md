@@ -35,6 +35,12 @@ systems and real drives ([how Coffer is tested](#how-coffer-is-tested)).
 The vault format is public and fixed, pinned by
 [test vectors](docs/test-vectors.json).
 
+> [!IMPORTANT]
+> **New project? Safe to try.** The vault is a copy — your own
+> repository stays as it is. And you can leave any time:
+> `gitcoffer export-bundle` writes a normal git bundle that any git can
+> read. Nothing is locked in.
+
 ## Why
 
 <p align="center">
@@ -345,8 +351,9 @@ the [threat model](docs/threat-model.md) and the
 
 ## Contributing
 
-Issues and pull requests are welcome — holes in the threat model, gaps in
-the guide, portability reports, and fixes all count. All artifacts in this
+If Coffer works for you, a star helps others find it. Issues and pull
+requests are welcome — holes in the threat model, gaps in the guide,
+portability reports, and fixes all count. All artifacts in this
 repository are written in English; see
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
