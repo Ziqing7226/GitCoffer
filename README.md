@@ -37,9 +37,9 @@ The vault format is public and fixed, pinned by
 
 > [!IMPORTANT]
 > **New project? Safe to try.** The vault is a copy — your own
-> repository stays as it is. And you can leave any time:
-> `gitcoffer export-bundle` writes a normal git bundle that any git can
-> read. Nothing is locked in.
+> repository stays as it is. And you can leave any time: run
+> `gitcoffer export-bundle`, and it writes one normal file — a git
+> bundle that any git can read.
 
 ## Why
 
@@ -47,9 +47,9 @@ The vault format is public and fixed, pinned by
   <img src="docs/assets/why-coffer.png" alt="A vault at the center, surrounded by: no third party, single static binary, cross-platform, native git clients" width="560">
 </p>
 
-- **No third party.** The remote is a folder you control — a USB stick,
-  an external drive, a second disk. Nothing leaves your hardware; the
-  code has no networking.
+- **No third party.** The remote is a folder — a USB stick, an
+  external drive, a second disk. The code has no networking: no service
+  sits between you and your data.
 - **Encrypted at rest.** Everything is encrypted under your passphrase
   (Argon2id and XChaCha20-Poly1305). A changed byte fails the check, so
   damage cannot hide. Without the passphrase, the drive holds noise,
@@ -58,6 +58,9 @@ The vault format is public and fixed, pinned by
   [git remote helper](docs/architecture.md). No special git, no
   wrappers, no server. If `git push` works, Coffer works — and so does
   the VSCode Sync button.
+- **Works with or without a host.** A vault is enough on its own. If
+  you already use GitHub or GitLab, you can keep using it and add the
+  vault as a second remote for backups.
 - **Single static binary.** No GPG, no FUSE, no drivers, no
   administrator rights. The vault is plain files, so exFAT and FAT32
   drives work fully.
@@ -147,7 +150,7 @@ $ git remote add origin usb://myproject.coffer
 Git applies the rule on every use. Two notes: the rule lives on each
 machine, so a colleague needs the same line; and when the drive's path
 changes (a new drive letter, a new mount point), you update this one
-line instead of every clone.
+line, and every clone follows.
 
 ## How it works
 
@@ -186,8 +189,9 @@ $ git push --mirror coffer::/mnt/usb/myproject.coffer
 ```
 
 From then on, pushes go to the vault; cloning on another machine is one
-command ([Quick start](#quick-start)). Delete the old repository once
-you are comfortable — the vault plus the passphrase restores everything.
+command ([Quick start](#quick-start)). You can delete the old
+repository once you are comfortable — the vault plus the passphrase
+restores everything.
 
 ### If pull does nothing after the switch
 
@@ -235,8 +239,8 @@ On the drive: one new folder. Nothing else changed.
 | `gitcoffer completion <shell>` | print a completion script for bash, zsh, fish, or powershell |
 
 Please run `gitcoffer fsck` on your vault from time to time — after a
-big push, or once a month. It checks every seal and the manifest chain,
-so a failing medium is caught early, while recovery is still easy.
+big push, or once a month. It checks every part of the vault, so a
+failing drive is caught early, while recovery is still easy.
 
 Full walkthrough — keys and recovery, maintenance, troubleshooting:
 [docs/user-guide.md](docs/user-guide.md).
@@ -302,6 +306,10 @@ Four good ways exist to protect that copy:
 - **Use an encrypted remote helper** — the whole remote is encrypted,
   `git push` stays one step on every platform, nothing to mount or run.
   This is Coffer.
+
+A vault is just encrypted files, so it can even live on storage you
+don't fully trust — a NAS, an office share, a mounted cloud folder.
+The people who manage that storage cannot read your code.
 
 When each fits, and Coffer's honest limits, are set out in
 [docs/choosing-an-approach.md](docs/choosing-an-approach.md).
