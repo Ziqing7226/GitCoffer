@@ -132,6 +132,21 @@ if you deliberately share a vault, give each project its own branch
 name (`repo1-main`, `repo2-main`) — everything else (fsck, gc, keys)
 treats the vault as a whole.
 
+### Two remotes at once
+
+A vault does not have to replace your host. Keep `origin` on GitHub and
+add the vault as a second remote:
+
+```console
+$ git remote add vault coffer::/mnt/usb/myproject.coffer
+$ git push vault --all
+$ git push vault --tags
+```
+
+From then on, `git push` — and VSCode's Sync button — still goes to
+`origin`, because the branch tracks it; `git push vault` updates the
+backup. Share on the host, back up on the drive, from the same clone.
+
 ### Passphrases on Windows
 
 Interactive use needs nothing special: git prompts in the terminal, and

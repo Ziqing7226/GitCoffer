@@ -33,3 +33,14 @@ Coffer lives in the fourth shape. Its design follows the path that
 [git-remote-gcrypt](https://github.com/spwhitton/git-remote-gcrypt)
 proved on Linux, and aims to offer it everywhere with no dependencies —
 we are grateful for the ground it broke.
+
+## Storage you don't fully trust
+
+Because a vault is just encrypted files, it can live on storage you
+don't administer: a NAS, an office share, a cloud folder mounted
+locally (sync clients need the usual care), a VPS through rclone.
+Whoever runs that storage sees files, sizes, and timestamps — never
+your code. A forge can't offer this: its server reads plaintext
+repositories. Coffer is not a server — no accounts, no web UI, nothing
+listening — it is the choice for when the storage, not the git
+workflow, is the part you don't trust.
