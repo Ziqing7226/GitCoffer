@@ -300,6 +300,22 @@ damaging anything.
   door — older binaries refuse the migrated vault — before it acts.
   `status` and `doctor` surface an available migration as a hint line;
   nothing ever upgrades automatically. (2026-10-13)
+- **Public-key slots (format v2 candidate).** Collaboration today has
+  three gaps: granting a slot transports a secret (the new passphrase
+  must reach the collaborator over a secure channel), there is no
+  writer identity (a manifest proves *some* valid credential wrote it,
+  not whose), and there are no hardware tokens. GPG was considered and
+  declined: it would trade away the zero-dependency binary, the
+  Windows experience, the frozen-format test vectors, and the
+  tunable Argon2id cost model to gain gcrypt's strongest feature — and
+  gcrypt already serves the people who want exactly that. The
+  candidate instead: a new slot type sealed to a public key (X25519 +
+  HKDF + XChaCha20-Poly1305 wrapping the existing DEK, the `age`
+  pattern) — `gitcoffer keygen`, the public key travels over any
+  channel, `key add --pubkey` grants access; per-writer identity
+  wrapping rides the same redesign. Not 1.1.0 scope: decide when
+  drafting the v2 envelope, so AAD binding, writer identity, and
+  public-key slots land as one coherent specification. (2026-10-14)
 - **Brute-force resistance options, honestly scoped.** Guessing a
   vault's passphrase is an OFFLINE attack: the attacker with the medium
   runs their own tools against the sealed key slot, so no rate limiter
