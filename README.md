@@ -36,10 +36,11 @@ The vault format is public and fixed, pinned by
 [test vectors](docs/test-vectors.json).
 
 > [!IMPORTANT]
-> **New project? Safe to try.** The vault is a copy — your own
-> repository stays as it is. And you can leave any time: run
-> `gitcoffer export-bundle`, and it writes one normal file — a git
-> bundle that any git can read.
+> **New project? Safe to try.** Your working repository stays a normal
+> git repository, plain and standard. The vault is only an encrypted
+> copy of it on another disk. You can leave any time: push your
+> repository to any host and delete the vault — or run
+> `gitcoffer export-bundle` and get a normal git bundle file.
 
 ## Why
 
@@ -147,10 +148,11 @@ $ git config --global url."coffer::/mnt/usb/".insteadOf "usb://"
 $ git remote add origin usb://myproject.coffer
 ```
 
-Git applies the rule on every use. Two notes: the rule lives on each
-machine, so a colleague needs the same line; and when the drive's path
-changes (a new drive letter, a new mount point), you update this one
-line, and every clone follows.
+Git applies the rule on every use. Two notes:
+
+- The rule lives on each machine, so a colleague needs the same line.
+- When the drive's path changes (a new drive letter, a new mount
+  point), you update this one line, and every clone follows.
 
 ## How it works
 
@@ -359,11 +361,11 @@ the [threat model](docs/threat-model.md) and the
 
 ## Contributing
 
-If Coffer works for you, a star helps others find it. Issues and pull
-requests are welcome — holes in the threat model, gaps in the guide,
-portability reports, and fixes all count. All artifacts in this
-repository are written in English; see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+- If Coffer works for you, a star helps others find it.
+- Issues and pull requests are welcome — holes in the threat model,
+  gaps in the guide, portability reports, and fixes all count.
+- All artifacts in this repository are written in English; see
+  [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
