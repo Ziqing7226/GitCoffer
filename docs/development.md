@@ -268,7 +268,10 @@ damaging anything.
   git-remote-gcrypt's `--check`: exit 0 = vault exists and opens with
   the supplied passphrase; 1 = it is a vault but does not open (wrong
   passphrase or damage); 100 = not a vault (or unreachable). For
-  backup scripts and tooling to branch on.
+  backup scripts and tooling to branch on. Ship it with a copy-paste
+  scheduling recipe in the guide — a cron line, and the Task Scheduler
+  equivalent — so periodic health checks exist without a daemon.
+  (2026-10-14)
 - **Migratable key-file paths** (above).
 - **gc repacking** (above) — reclaims deleted history for real.
 - **Vault move command** — `gitcoffer move <vault> <new-path>` relocates
