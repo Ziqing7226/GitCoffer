@@ -197,12 +197,17 @@ restores everything.
 
 ### If pull does nothing after the switch
 
-After you point `origin` at the vault, `git pull` may do nothing and
-VSCode may show "Publish Branch" again. Standard git, not a Coffer
-fault: the branch still tracks the old remote. Fix it once:
+After you point `origin` at the vault, the branch still tracks the old
+remote, so `git pull` may do nothing and VSCode may show "Publish
+Branch" again. Standard git, not a Coffer fault. The helper fixes this
+by itself whenever it has work to do: after a push, or after a fetch
+that transfers something, it attaches the branch to the vault remote
+(`main` to `origin/main`) and prints what it did. If your pull still
+does nothing — a fetch with nothing to transfer never triggers it —
+fix it once:
 
 ```console
-$ git fetch origin
+$ git push origin main                                # or, manually:
 $ git branch --set-upstream-to=origin/main main   # use your branch name
 ```
 

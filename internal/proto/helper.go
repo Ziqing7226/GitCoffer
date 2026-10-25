@@ -435,6 +435,7 @@ func (s *session) serveFetch(oids []string) error {
 	s.progressf("done in %s", time.Since(started).Round(time.Millisecond))
 	fmt.Fprintln(s.out) // batch complete
 	s.out.Flush()
+	s.maybeAttachUpstream(nil, false)
 	return nil
 }
 
@@ -594,6 +595,7 @@ func (s *session) applyPush(specs []string) (err error) {
 		}
 	}
 	s.reply(report...)
+	s.maybeAttachUpstream(specs, failed)
 	return nil
 }
 

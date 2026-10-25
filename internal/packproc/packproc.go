@@ -260,3 +260,95 @@ func CallerIsShallow() (bool, error) {
 	}
 	return false, fmt.Errorf("unexpected --is-shallow-repository output %q", string(out))
 }
+
+// CallerIsBare reports whether the repository invoking the helper is bare.
+func CallerIsBare() (bool, error) {
+	out, err := exec.Command("git", "rev-parse", "--is-bare-repository").Output()
+	if err != nil {
+		return false, fmt.Errorf("git rev-parse --is-bare-repository: %v", err)
+	}
+	switch strings.TrimSpace(string(out)) {
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	}
+	return false, fmt.Errorf("unexpected --is-bare-repository output %q", string(out))
+}
+
+// CallerHeadBranch returns the branch HEAD points at ("main"), or an
+// error when HEAD is detached (or unborn and unresolvable) — in those
+// states there is no current branch to reason about.
+func CallerHeadBranch() (string, error) {
+	out, err := exec.Command("git", "symbolic-ref", "--quiet", "HEAD").Output()
+	if err != nil {
+		return "", fmt.Errorf("no current branch (detached HEAD)")
+	}
+	ref := strings.TrimSpace(string(out))
+	return strings.TrimPrefix(ref, "refs/heads/"), nil
+}
+
+// CallerBranchExists reports whether the local branch ref exists. A clone
+// in mid-fetch has an unborn HEAD: the branch name resolves but the ref
+// does not, and attaching tracking then would race git's own clone setup.
+func CallerBranchExists(branch string) bool {
+	return exec.Command("git", "show-ref", "--verify", "--quiet", "refs/heads/"+branch).Run() == nil
+}
+
+// CallerBranchUpstreamRemote returns the remote the branch's upstream is
+// configured against, or "" when the branch tracks nothing. Config is the
+// truth here, not ref existence: tracking configured against any remote —
+// even one whose refs are gone — must never be stolen.
+func CallerBranchUpstreamRemote(branch string) string {
+	out, err := exec.Command("git", "config", "--get", "branch."+branch+".remote").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// CallerRemotes lists the caller's configured remotes.
+func CallerRemotes() ([]string, error) {
+	out, err := exec.Command("git", "remote").Output()
+	if err != nil {
+		return nil, fmt.Errorf("git remote: %v", err)
+	}
+	var remotes []string
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line != "" {
+			remotes = append(remotes, line)
+		}
+	}
+	return remotes, nil
+}
+
+// CallerRemoteEffectiveURL returns the remote's URL after insteadOf
+// rewrites — what git would actually connect to, without connecting.
+func CallerRemoteEffectiveURL(remote string) (string, error) {
+	out, err := exec.Command("git", "ls-remote", "--get-url", remote).Output()
+	if err != nil {
+		return "", fmt.Errorf("git ls-remote --get-url %s: %v", remote, err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// SetBranchUpstream points branch at remote's same-named branch — the
+// same config git branch --set-upstream-to writes. The plain command is
+// preferred (it validates); during a helper conversation the
+// remote-tracking ref may not exist yet (git creates it after the
+// conversation ends), so the config form is the fallback.
+func SetBranchUpstream(branch, remote string) error {
+	if err := exec.Command("git", "branch", "--set-upstream-to="+remote+"/"+branch, branch).Run(); err == nil {
+		return nil
+	}
+	for _, kv := range [][2]string{
+		{"branch." + branch + ".remote", remote},
+		{"branch." + branch + ".merge", "refs/heads/" + branch},
+	} {
+		cmd := exec.Command("git", "config", kv[0], kv[1])
+		if out, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git config %s: %v: %s", kv[0], err, out)
+		}
+	}
+	return nil
+}

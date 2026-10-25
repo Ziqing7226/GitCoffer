@@ -20,6 +20,23 @@
   and Task Scheduler lines that feed the passphrase from a
   permission-protected file, with the honest note about what that file
   grants.
+- Helper: upstream auto-attach, from a real v1.0.0 report (after
+  re-pointing `origin` from a host to a vault, `git pull` silently did
+  nothing and VSCode showed "Publish Branch" — no upstream tracking
+  after the switch). After a push, or after a fetch that transfers
+  something, when the caller's current branch tracks nothing anywhere and
+  the coffer remote has a branch of the same name, the helper attaches
+  it (`main` -> `origin/main`) and prints what it did plus the undo
+  (`git branch --unset-upstream`). Guards, each with a reason: current
+  branch only and only when the push was exactly that branch — never
+  under `--all`/`--mirror`, where "same name exists" carries no intent;
+  never when any upstream is configured, so the documented
+  host-plus-vault dual-remote flow keeps its tracking; never under a dry
+  run; non-bare callers only; a clone mid-fetch is left to git's own
+  tracking setup. When a guard blocks an otherwise-eligible attach, the
+  helper prints the `git branch --set-upstream-to` hint instead of
+  acting. The README's "pull does nothing" section and the guide's
+  troubleshooting row now lead with the automatic fix.
 
 - Versioning convention: a.b.c with positive integers — a is the major
   direction, b the minor direction (its goals are written down before

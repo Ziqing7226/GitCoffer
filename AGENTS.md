@@ -12,7 +12,8 @@ first-class; VSCode works because git works.
 **Current state: v1.0.0 released** — vault format v1 (frozen, pinned by
 docs/test-vectors.json), the `git-remote-coffer` helper (progress
 milestones, writer lock, `--atomic`/`--force-with-lease`, server-side
-non-fast-forward protection, credential approval, HEAD fallback for
+non-fast-forward protection, credential approval, upstream auto-attach
+after fetch/push, HEAD fallback for
 non-main repositories), the `gitcoffer` CLI (init, status, key
 add/remove/list, rekey, gc report-only with --prune, fsck, doctor,
 export-bundle, version --json, completion, self-describing `help`,
