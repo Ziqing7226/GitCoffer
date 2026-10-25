@@ -121,6 +121,26 @@ only proves the vault opens. The user guide's Maintenance section has
 the cron and Task Scheduler recipes.`,
 	},
 	{
+		name:    "move",
+		summary: "relocate a vault directory (source never modified)",
+		detail: `Moves the vault to <new-path>. The source is never modified,
+so the worst outcome is a cleaned-up partial target. Refused when the
+source is not a vault, is being written to, or the target exists
+non-empty (or is itself a vault) or lies inside the source.
+
+On one filesystem the move is a single atomic rename. Across
+filesystems the vault is copied under its writer lock and the copy is
+verified (opened and fscked) before success is reported; only then does
+the command ask whether to remove the source — declining, or a
+non-interactive run, keeps it as the natural backup.
+
+After the move, every clone needs one line (printed for you):
+git remote set-url origin "coffer::<new-path>". Key-file slots whose
+recorded path the move invalidates are flagged, and a target on an
+online or synced filesystem (network share, cloud folder) gets a word
+of caution.`,
+	},
+	{
 		name:    "export-bundle",
 		summary: "export the vault as a plain git bundle",
 		detail: `Prompts for the passphrase, then decrypts the vault into
@@ -168,6 +188,8 @@ func helpUsage(name string) string {
 	switch name {
 	case "init", "status", "rekey", "fsck", "doctor", "check":
 		return "gitcoffer " + name + " <vault-directory>"
+	case "move":
+		return "gitcoffer move <vault-directory> <new-path>"
 	case "key":
 		return "gitcoffer key add [-keyfile <path>] <vault-directory>\n    " +
 			"gitcoffer key remove <vault-directory> <slot-id>\n    " +

@@ -37,6 +37,20 @@
   helper prints the `git branch --set-upstream-to` hint instead of
   acting. The README's "pull does nothing" section and the guide's
   troubleshooting row now lead with the automatic fix.
+- CLI: `gitcoffer move <vault-directory> <new-path>` — relocate a vault
+  directory, from the 1.1.0 plan. The source is never modified, so the
+  worst outcome is a cleaned-up partial target. Refusals: source not a
+  vault or actively locked; target non-empty, an existing vault, or
+  inside the source. Same-filesystem moves are one atomic rename;
+  cross-filesystem moves copy under the source's writer lock and the
+  copy is opened and fscked before success is reported, then the
+  command asks whether to remove the source (declining, or a
+  non-interactive run, keeps it as the natural backup). The report
+  prints the exact `git remote set-url` line, flags key-file slots
+  whose recorded path the move invalidates, and cautions when the
+  target sits on an online or synced filesystem. The guide's
+  Maintenance section documents the whole flow, including the key-file
+  caveat.
 
 - Versioning convention: a.b.c with positive integers — a is the major
   direction, b the minor direction (its goals are written down before

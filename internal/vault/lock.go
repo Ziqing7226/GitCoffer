@@ -93,6 +93,27 @@ func sanitizeHost(h string) string {
 	}, h)
 }
 
+// LockHeld reports whether the vault's writer lock is held by an active
+// writer: present and not yet stealable. A stale lock (crashed holder)
+// reports false — the next writer steals it as usual. Move uses this to
+// refuse touching a vault mid-write; readers never lock.
+func LockHeld(dir string) bool {
+	path := filepath.Join(dir, lockName)
+	data, err := readLimited(path, 8192)
+	if err != nil {
+		return false // no lock file: nothing is holding it
+	}
+	held, ok := parseLock(data)
+	if !ok {
+		held = lockInfo{} // unparseable content: mtime decides, as in acquireLock
+	}
+	mtime := time.Now()
+	if fi, serr := os.Stat(path); serr == nil {
+		mtime = fi.ModTime()
+	}
+	return !stale(held, mtime)
+}
+
 // acquireLock takes the vault writer lock (spec §6, writer lock): an
 // exclusively created vault.lock held for the duration of one write
 // operation, so concurrent writers cannot lose each other's updates.

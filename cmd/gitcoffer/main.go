@@ -138,6 +138,8 @@ func main() {
 		err = doctorCmd(os.Args[2:])
 	case "check":
 		err = checkCmd(os.Args[2:])
+	case "move":
+		err = moveCmd(os.Args[2:])
 	case "export-bundle":
 		err = exportBundleCmd(os.Args[2:])
 	case "help", "-h", "--help":
@@ -197,6 +199,7 @@ func usage() {
   gitcoffer fsck <vault-directory>              verify every structure of the vault
   gitcoffer doctor <vault-directory>            check the environment and the vault, and report
   gitcoffer check <vault-directory>             probe for scripts: 0 opens, 1 vault that does not open, 100 not a vault
+  gitcoffer move <vault-dir> <new-path>         relocate a vault directory (source is never modified)
   gitcoffer export-bundle <vault-dir> <file>    export the vault as a plain git bundle
   gitcoffer version [--json]                    print the build version
   gitcoffer completion <bash|zsh|fish|powershell>

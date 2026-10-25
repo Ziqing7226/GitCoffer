@@ -237,6 +237,7 @@ unchanged. The on-disk format is specified and frozen in
 | `gitcoffer fsck <dir>` | verify every structure of the vault |
 | `gitcoffer doctor <dir>` | check the environment and the vault, and report |
 | `gitcoffer check <dir>` | probe a vault from a script (exit 0 opens, 1 does not open, 100 not a vault) |
+| `gitcoffer move <dir> <new-path>` | relocate a vault directory (same-disk moves are atomic; copies are verified before success) |
 | `gitcoffer export-bundle <dir> <file>` | export the vault as a plain git bundle |
 | `gitcoffer version [--json]` | print the build version (optionally as JSON) |
 | `gitcoffer completion <shell>` | print a completion script for bash, zsh, fish, or powershell |
@@ -359,6 +360,40 @@ Run Result (0 = the vault opened):
 ```bat
 schtasks /create /tn "Coffer check" /sc daily /st 03:30 /tr "powershell -NoProfile -Command ""Get-Content $env:USERPROFILE\.coffer-pass | gitcoffer check D:\backups\myproject.coffer"""
 ```
+
+### Moving a vault
+
+A vault is a self-contained directory, so moving it to another disk or
+folder is safe whenever no push is running:
+
+```bash
+gitcoffer move "/mnt/usb/myproject.coffer" "/mnt/usb2/myproject.coffer"   # Linux
+gitcoffer move "/Volumes/Backup/myproject.coffer" "/Volumes/New/myproject.coffer"   # macOS
+gitcoffer move D:\backups\myproject.coffer E:\myproject.coffer            # Windows
+```
+
+On one filesystem the move is a single atomic rename. Across filesystems
+the vault is copied while writers are frozen out, and the copy is opened
+and fscked before the command reports success — only then are you asked
+whether to delete the source (answering no, or running from a script,
+keeps it as the natural backup). The source is never modified along the
+way.
+
+Afterwards every clone needs one line — the command prints it for you:
+
+```bash
+git remote set-url origin "coffer::/mnt/usb2/myproject.coffer"
+```
+
+One caveat: a key-file slot records the key file's exact path. If the
+key file lived inside the moved vault (or its recorded path was
+relative), `move` flags the slot — restore a key file at the recorded
+path, or replace the slot with `gitcoffer key add`. Passphrase-only
+vaults move without any caveat.
+
+Host↔vault relocations are a different operation (moving a project to or
+from GitHub): those are the plain-git migration steps in the README, not
+this command.
 
 ## Troubleshooting
 
