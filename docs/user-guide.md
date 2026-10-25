@@ -262,13 +262,19 @@ a second factor; losing it locks out every slot that requires it.
   `printf 'protocol=coffer\nhost=coffer\npath=<vault id>\n\n' | git credential reject`
 - Share access with a collaborator or machine by adding a slot
   (`gitcoffer key add`) instead of sharing one passphrase.
-- A key-file slot records the key file's **exact path** and always reads
-  that path: a copy of the same file elsewhere does not unlock the slot,
-  and moving the vault or the key file to another machine (or another
-  drive letter) locks the slot until the file is back at the recorded
-  path — or a new slot is added with the file at its new location. Keep
-  key files on a stable path that exists on every machine that opens
-  the vault.
+- A key-file slot records the key file's **exact path** and reads that
+  path first. A copy of the same bytes elsewhere does not unlock the slot
+  at that path, and a file whose content *changed* at the recorded path
+  is refused with a precise error. When the recorded path no longer
+  exists — the vault and the key file moved together to another machine
+  or drive letter — the slot records what the key file *hashes to*, and
+  Coffer recognizes the file by content: a shallow search of the folder
+  holding the vault and the vault directory itself. Put the key file
+  next to the vault on the medium and the pair travels freely; keep it
+  elsewhere (the stronger setup — a thief of the medium then misses the
+  second factor) and that path must exist on every machine that opens
+  the vault. `gitcoffer doctor` reports a recognized key file and
+  suggests re-registering it with `gitcoffer key add`.
 
 **Recovering on a fresh machine:** install git and Coffer, mount the
 medium, `git clone coffer::<path>`, enter the passphrase. Keeping a copy
@@ -388,9 +394,10 @@ git remote set-url origin "coffer::/mnt/usb2/myproject.coffer"
 
 One caveat: a key-file slot records the key file's exact path. If the
 key file lived inside the moved vault (or its recorded path was
-relative), `move` flags the slot — restore a key file at the recorded
-path, or replace the slot with `gitcoffer key add`. Passphrase-only
-vaults move without any caveat.
+relative), `move` flags the slot — content recognition usually finds the
+file at the new location anyway; otherwise restore a key file at the
+recorded path, or replace the slot with `gitcoffer key add`.
+Passphrase-only vaults move without any caveat.
 
 Host↔vault relocations are a different operation (moving a project to or
 from GitHub): those are the plain-git migration steps in the README, not
@@ -426,7 +433,7 @@ newer. `status` and `doctor` print a hint on v1 vaults.
 |---|---|
 | `not a coffer vault` on push | The remote URL does not point at a vault. Check the path, or run `gitcoffer init`. |
 | `authentication failed` on every operation | Wrong passphrase, or a credential helper answers with a stale value (common right after a rekey). Evict it with the `git credential reject` line above. |
-| `key file ... no such file` | A second-factor slot's key file is missing at its recorded path. Restore it; nothing else will unlock that slot. |
+| `key file ... no such file` | A second-factor slot's key file is missing at its recorded path. If the file moved with the vault, Coffer recognizes it by content in the folder holding the vault — otherwise restore it at the recorded path, or add a new slot with the file at its new location. |
 | `key file ... is not a regular file` | The recorded path is a symlink, device, or oversized (>1 MiB) file. Coffer refuses such paths because they come from on-media metadata — point the slot at the real file instead. |
 | Push refused: repository is shallow | The push came from a depth-limited clone, whose history is truncated. Run `git fetch --unshallow` against its current origin and push again. |
 | Push or fetch refused: repository uses sha256 object ids | The vault format speaks sha1 object ids. Re-create the repository with the default sha1 format (`git init` without `--object-format=sha256`). |

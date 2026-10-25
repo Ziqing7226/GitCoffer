@@ -63,9 +63,11 @@ remembered one via rekey.
       Add a slot: prompts for the current passphrase, then for the new
       passphrase twice. With -keyfile the slot additionally requires
       that key file; the file is created with random bytes when it does
-      not exist. A key-file slot records the key file's exact path — a
-      copy of the file at another path does not unlock it. A vault
-      holds at most 16 slots.
+      not exist. A key-file slot records the key file's exact path and
+      what its bytes hash to — a copy at another path does not unlock
+      it, but when the recorded path is gone (the vault and key file
+      moved together), the file is recognized by content in the folder
+      holding the vault. A vault holds at most 16 slots.
 
   gitcoffer key remove <vault-directory> <slot-id>
       Remove one slot by its id (see key list). The last remaining slot

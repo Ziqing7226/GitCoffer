@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/Ziqing7226/GitCoffer/internal/crypto"
@@ -36,8 +37,22 @@ func slotSecret(dir string, slot crypto.Slot, passphrase string) (string, error)
 		// rewritten: refuse non-regular files (a device or FIFO would
 		// read forever) and bound the size.
 		data, err := readLimited(path, 1<<20)
+		if err != nil && slot.KeyfileID != "" {
+			// The recorded path is gone — a move between machines or
+			// drive letters. Recognize the key file by content.
+			if found, ferr := FindKeyfileByID(dir, slot.KeyfileID); ferr == nil {
+				if data, err = readLimited(found, 1<<20); err == nil {
+					path = found
+				}
+			}
+		}
 		if err != nil {
 			return "", fmt.Errorf("key file for slot %d: %v", slot.ID, sanitizePath(err.Error()))
+		}
+		if slot.KeyfileID != "" && crypto.Hash(data) != slot.KeyfileID {
+			// The file at the recorded path changed since the slot was
+			// made — not the key file this slot was sealed with.
+			return "", fmt.Errorf("key file for slot %d: %s no longer matches the key file recorded for this slot (content changed)", slot.ID, sanitizePath(path))
 		}
 		return passphrase + string(data), nil
 	default:
@@ -136,6 +151,7 @@ func (s *Store) AddSlot(newPass, keyfile string) (int, error) {
 		if err == nil {
 			created.Input = crypto.InputPassphraseKeyfile
 			created.Keyfile = keyfile
+			created.KeyfileID = crypto.Hash(data)
 		}
 	} else {
 		created, err = crypto.SealSlot(id, secret, s.dek, s.meta.ID, crypto.DefaultParams())
@@ -149,6 +165,48 @@ func (s *Store) AddSlot(newPass, keyfile string) (int, error) {
 	}
 	return id, nil
 }
+
+// findKeyfileByID looks for a file whose SHA-256 matches id, searching
+// the vault's parent directory and then the vault directory itself —
+// shallow and bounded: the places a vault-plus-key-file set travels
+// together to, never a filesystem-wide scan. The parent comes first
+// because a key file inside the vault is refused at creation (a moved-in
+// copy is still accepted when found).
+func FindKeyfileByID(vaultDir, id string) (string, error) {
+	for _, dir := range []string{filepath.Dir(vaultDir), vaultDir} {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			continue
+		}
+		names := make([]string, 0, len(entries))
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		sort.Strings(names) // deterministic across directory orders
+		for i, name := range names {
+			if i >= maxKeyfileScan {
+				break
+			}
+			path := filepath.Join(dir, name)
+			info, ierr := os.Lstat(path)
+			if ierr != nil || !info.Mode().IsRegular() || info.Size() > 1<<20 || info.Size() < minKeyfileSize {
+				continue
+			}
+			data, rerr := readLimited(path, 1<<20)
+			if rerr != nil {
+				continue
+			}
+			if crypto.Hash(data) == id {
+				return path, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no file matching the recorded key file was found next to the vault")
+}
+
+// maxKeyfileScan bounds the content search: a drive root can hold more
+// files than any recognition should read.
+const maxKeyfileScan = 1000
 
 // minKeyfileSize is the smallest existing file accepted as a key file: an
 // empty or tiny file would make the "second factor" vacuous (the KDF input
@@ -307,6 +365,7 @@ func (s *Store) Rekey(newPass string) error {
 		// passphrase-only slot would strip the second factor with no
 		// warning.
 		secret := newPass
+		var keyfileData []byte
 		if sl.Input == crypto.InputPassphraseKeyfile {
 			if sl.Keyfile == "" {
 				return fmt.Errorf("slot %d requires a key file but records none — the slot cannot be re-keyed; contact the vault administrator", sl.ID)
@@ -320,6 +379,7 @@ func (s *Store) Rekey(newPass string) error {
 				return fmt.Errorf("key file for slot %d: %v", sl.ID, sanitizePath(err.Error()))
 			}
 			secret = newPass + string(data)
+			keyfileData = data
 		}
 		fresh, err := crypto.SealSlot(sl.ID, secret, s.dek, s.meta.ID, crypto.DefaultParams())
 		if err != nil {
@@ -328,6 +388,11 @@ func (s *Store) Rekey(newPass string) error {
 		if sl.Input != "" {
 			fresh.Input = sl.Input
 			fresh.Keyfile = sl.Keyfile
+			if keyfileData != nil {
+				// Re-keying reads the current key file: record what it
+				// hashes to now, so recognition survives future moves.
+				fresh.KeyfileID = crypto.Hash(keyfileData)
+			}
 		}
 		s.meta.Slots[i] = *fresh
 		break

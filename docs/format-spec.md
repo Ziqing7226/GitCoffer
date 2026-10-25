@@ -66,7 +66,8 @@ A single JSON object, created by `gitcoffer init`, rewritten only by
       "aead": { "algo": "xchacha20-poly1305", "nonce": "<b64, 24 bytes>" },
       "dek": "<b64: AEAD(plaintext = DEK, key = KEK, nonce, AAD(\"meta-slot/<vault id>/<slot id>\"))>",
       "input": "passphrase+keyfile",
-      "keyfile": "/path/to/coffer.key"
+      "keyfile": "/path/to/coffer.key",
+      "keyfile_id": "<64 hex: SHA-256 of the key-file bytes, optional>"
     }
   ]
 }
@@ -92,6 +93,16 @@ Rules:
   and the KEK is `Argon2id(passphrase ‖ key-file bytes, salt, m, t, p)`.
   The key file is deliberately NOT part of the vault: losing it locks out
   every slot that requires it.
+- `keyfile_id` (optional, the same version-free class as `input` and
+  `keyfile`) records the SHA-256 of the key-file bytes. When the recorded
+  path no longer exists — the vault-plus-key-file set moved between
+  machines or drive letters — a reader MAY recognize the file by content:
+  a shallow, bounded search of the vault's parent directory and the vault
+  directory itself, regular files only. A file found by content MUST hash
+  to `keyfile_id`; when the file at the recorded path no longer hashes to
+  it, the slot MUST be refused with a precise error (the key file
+  changed). Readers written before this field ignore it and rely on the
+  recorded path alone.
 - The KEK is `Argon2id(passphrase, salt, m, t, p)` for the slot's stored
   parameters. A slot succeeds if and only if its `dek` field authenticates.
 - `salt` is 16 bytes at creation; readers SHOULD accept salts of at least

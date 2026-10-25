@@ -74,6 +74,21 @@
   finished by running it again. Confirmation is required (or `-yes`
   for scripts); `status` and `doctor` print an upgrade hint on v1
   vaults. Conformance vectors pin the v2 manifest seal.
+- Key files: migratable paths via content recognition. A key-file slot
+  now records what its key file hashes to (`keyfile_id`, an optional
+  field in the same version-free class as `input`/`keyfile`, so 1.0.0
+  readers simply ignore it). When the recorded path no longer exists —
+  the vault-plus-key-file set moved between machines or drive letters —
+  the file is recognized by content through a shallow, bounded search of
+  the folder holding the vault and the vault directory itself. A file
+  whose content changed at the recorded path is refused with a precise
+  error instead of a generic authentication failure. `rekey` refreshes
+  the recorded hash; `doctor` reports a recognized key file and suggests
+  re-registering it; `move`'s key-file notes now mention recognition.
+  The threat model states the honest trade: the hash is plaintext in
+  vault.meta, letting an attacker verify key-file candidates without
+  the Argon2id cost — random key files (what Coffer creates) are
+  unaffected.
 - Versioning convention: a.b.c with positive integers — a is the major
   direction, b the minor direction (its goals are written down before
   work starts), c the rc counter of the current direction; candidates

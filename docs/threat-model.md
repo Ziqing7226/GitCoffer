@@ -99,6 +99,15 @@ in the future blocks writes for at most about one staleness window
 (an mtime within the skew bound can add up to the skew on top), never
 until its stated date.
 
+One optional field trades a little metadata for mobility: a key-file
+slot may record the SHA-256 of the key file's bytes, so a moved vault
+can recognize its key file by content (a shallow, bounded search next to
+the vault) instead of locking the slot out. That hash is in plaintext
+`vault.meta`, which means an attacker holding the vault can confirm a
+guessed key-file candidate without paying the Argon2id cost. Key files
+created by Coffer are 32 random bytes — unguessable — and the passphrase
+factor still stands; treat user-supplied key files with this in mind.
+
 ## What Coffer is not
 
 One page, plainly:

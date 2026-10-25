@@ -193,12 +193,12 @@ func moveReport(meta vault.Meta, src, dst string, keyfileNotes []string, copied 
 }
 
 // keyfileSlotNotes flags key-file slots whose recorded path this move
-// invalidates. Two shapes break: an absolute path inside the moved tree
-// (the file travels along, but the slot still names the old location)
-// and a relative path that pointed outside the vault (the vault
-// directory was its base, and the base changed). A relative path that
-// pointed inside the vault travels with it and keeps resolving — no
-// note. Absolute paths elsewhere are untouched.
+// invalidates. Three shapes: an absolute path inside the moved tree
+// travels along (content recognition finds it next to — or inside — the
+// moved vault, but the slot still names the old location); a relative
+// path that pointed outside the vault loses its base; a relative path
+// inside the vault travels and keeps resolving. Absolute paths elsewhere
+// are untouched.
 func keyfileSlotNotes(meta vault.Meta, src string) []string {
 	var notes []string
 	for _, sl := range meta.Slots {
@@ -212,13 +212,13 @@ func keyfileSlotNotes(meta vault.Meta, src string) []string {
 				continue // travels with the vault; resolves the same way at the target
 			}
 			notes = append(notes, fmt.Sprintf(
-				"  [warn] slot %d's key file is recorded as the relative path %s, which pointed outside the vault — the vault directory was its base and just changed, so the slot cannot open until the key file is re-registered or restored at an absolute path",
+				"  [warn] slot %d's key file is recorded as the relative path %s, which pointed outside the vault — the vault directory was its base and just changed; the slot still opens when the key file is recognized by content next to the moved vault, or when it is re-registered via gitcoffer key add",
 				sl.ID, sanitizePath(registered)))
 			continue
 		}
 		if insideSource(src, filepath.Clean(registered)) {
 			notes = append(notes, fmt.Sprintf(
-				"  [warn] slot %d's key file lives inside the vault and is recorded at its old path (%s) — the file moved along, but the slot still names that exact path; it cannot open until a key file sits there again",
+				"  [warn] slot %d's key file lives inside the vault and is recorded at its old path (%s) — the file moved along and content recognition finds it at the new location; re-register it with gitcoffer key add to record the new path",
 				sl.ID, sanitizePath(registered)))
 		}
 	}

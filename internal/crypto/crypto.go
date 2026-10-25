@@ -116,12 +116,21 @@ const (
 // only opens under the secret whose Argon2id derivation matches the
 // stored parameters and salt.
 type Slot struct {
-	ID      int          `json:"id"`
-	KDF     Argon2Params `json:"kdf"`
-	AEAD    AEADInfo     `json:"aead"`
-	DEK     []byte       `json:"dek"`
-	Input   string       `json:"input,omitempty"`
-	Keyfile string       `json:"keyfile,omitempty"`
+	ID   int          `json:"id"`
+	KDF  Argon2Params `json:"kdf"`
+	AEAD AEADInfo     `json:"aead"`
+	DEK  []byte       `json:"dek"`
+	// Input selects the KDF input: passphrase, or
+	// passphrase+keyfile (constants below; empty means passphrase).
+	Input string `json:"input,omitempty"`
+	// Keyfile records the key file's path (absolute, or relative to the
+	// vault directory).
+	Keyfile string `json:"keyfile,omitempty"`
+	// KeyfileID, when present, is the hex SHA-256 of the key-file bytes:
+	// with the recorded path gone (a move between machines or drive
+	// letters), a reader may recognize the file by content instead. An
+	// optional field in the same version-free class as input/keyfile.
+	KeyfileID string `json:"keyfile_id,omitempty"`
 }
 
 // NewDEK returns a fresh random data-encryption key.

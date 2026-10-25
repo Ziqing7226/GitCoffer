@@ -100,6 +100,16 @@ func doctorCmd(args []string) error {
 			info, serr := os.Lstat(probe)
 			path := sanitizePath(probe)
 			switch {
+			case serr != nil && sl.KeyfileID != "":
+				// The recorded path is gone; the key file may have
+				// traveled with the vault (a move between machines or
+				// drive letters) — check whether the content is
+				// recognizable next to the vault.
+				if _, ferr := vault.FindKeyfileByID(dir, sl.KeyfileID); ferr == nil {
+					d.ok("slot %d key file recognized by content next to the vault (recorded path %s is gone — consider re-registering it with gitcoffer key add)", sl.ID, path)
+				} else {
+					d.warn("slot %d key file missing: %s (that slot cannot open until restored — a matching file next to the vault would also be recognized)", sl.ID, path)
+				}
 			case serr != nil:
 				d.warn("slot %d key file missing: %s (that slot cannot open until restored)", sl.ID, path)
 			case !info.Mode().IsRegular():
