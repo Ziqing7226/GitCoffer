@@ -14,7 +14,7 @@ import (
 
 // implementedCommands is the source of truth: every gitcoffer subcommand.
 var implementedCommands = []string{
-	"init", "status", "rekey", "key", "gc", "fsck", "doctor",
+	"init", "status", "rekey", "key", "gc", "fsck", "check", "doctor",
 	"export-bundle", "version", "completion", "help",
 }
 
@@ -187,7 +187,7 @@ func captureCompletionErr(t *testing.T, shell string) (string, error) {
 
 func TestCompletionCoversEveryCommand(t *testing.T) {
 	for shell, want := range map[string]string{
-		"bash":       "init status rekey key gc fsck doctor export-bundle version",
+		"bash":       "init status rekey key gc fsck doctor check export-bundle version",
 		"zsh":        "'init:create",
 		"fish":       "complete -c gitcoffer -n '__fish_use_subcommand' -a init",
 		"powershell": "'init','status'",

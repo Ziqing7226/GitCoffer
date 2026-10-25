@@ -15,7 +15,8 @@ milestones, writer lock, `--atomic`/`--force-with-lease`, server-side
 non-fast-forward protection, credential approval, HEAD fallback for
 non-main repositories), the `gitcoffer` CLI (init, status, key
 add/remove/list, rekey, gc report-only with --prune, fsck, doctor,
-export-bundle, version --json, completion, self-describing `help`), CI on Linux, Windows, and
+export-bundle, version --json, completion, self-describing `help`,
+three-state `check` for scripts), CI on Linux, Windows, and
 macOS plus a git 2.30 floor leg, three independent security review
 rounds complete, release workflow (six platforms) and packaging
 manifests under `packaging/`, and the user guide. The Homebrew tap and scoop bucket are live; the

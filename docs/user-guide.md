@@ -236,6 +236,7 @@ unchanged. The on-disk format is specified and frozen in
 | `gitcoffer gc [--prune] <dir>` | report orphaned objects, temp files, old generations — `--prune` actually removes them |
 | `gitcoffer fsck <dir>` | verify every structure of the vault |
 | `gitcoffer doctor <dir>` | check the environment and the vault, and report |
+| `gitcoffer check <dir>` | probe a vault from a script (exit 0 opens, 1 does not open, 100 not a vault) |
 | `gitcoffer export-bundle <dir> <file>` | export the vault as a plain git bundle |
 | `gitcoffer version [--json]` | print the build version (optionally as JSON) |
 | `gitcoffer completion <shell>` | print a completion script for bash, zsh, fish, or powershell |
@@ -308,6 +309,56 @@ FAT32 file-size caps) are listed in
   as still on the disk.
 - Both commands serialize with writers through the vault lock; concurrent
   pushes queue safely rather than corrupting.
+
+### Checking a vault on a schedule
+
+`gitcoffer check <vault-directory>` answers one question — does the
+vault open with its passphrase? — and encodes the answer in its exit
+code, so scripts and schedulers can branch on it:
+
+| Exit code | Meaning |
+|---|---|
+| 0 | the vault opened |
+| 1 | the path holds a vault that does not open — wrong passphrase, or damage |
+| 100 | not a vault, or the path is unreachable (a drive can be unplugged) |
+
+`check` proves only that the vault opens. Run `gitcoffer fsck` for full
+verification; a schedule that runs both catches a failing medium early.
+
+A scheduled run has no keyboard, but the check needs the passphrase.
+Put it in a file and feed that file on stdin. Protect the file with
+permissions: an attacker who can read it can open the vault. Keeping it
+on the machine that already holds the plaintext repository grants an
+attacker nothing new; do not copy it onto the vault drive itself.
+
+Store it once. Linux and macOS:
+
+```bash
+umask 077
+printf '%s\n' 'your-passphrase' > ~/.coffer-pass
+```
+
+Windows (PowerShell):
+
+```powershell
+"your-passphrase" | Out-File -Encoding ascii $env:USERPROFILE\.coffer-pass
+```
+
+Then schedule the checks — a nightly `check` and a monthly `fsck`. On
+Linux and macOS (`crontab -e`); a silent run is a passing run, and cron
+mails you whatever a failing or warning run prints:
+
+```cron
+30 3 * * * gitcoffer check "/mnt/usb/myproject.coffer" < "$HOME/.coffer-pass" >/dev/null || echo "coffer check FAILED: myproject"
+0 4 1 * * gitcoffer fsck "/mnt/usb/myproject.coffer" < "$HOME/.coffer-pass" >/dev/null || echo "coffer fsck FAILED: myproject"
+```
+
+On Windows, Task Scheduler records the exit code as the task's Last
+Run Result (0 = the vault opened):
+
+```bat
+schtasks /create /tn "Coffer check" /sc daily /st 03:30 /tr "powershell -NoProfile -Command ""Get-Content $env:USERPROFILE\.coffer-pass | gitcoffer check D:\backups\myproject.coffer"""
+```
 
 ## Troubleshooting
 

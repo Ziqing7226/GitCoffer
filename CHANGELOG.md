@@ -10,6 +10,16 @@
   opening the documentation. Usage errors exit 2 and per-command usage
   lines point at the matching help section; `-h` on a subcommand exits
   0 instead of reporting a flag error.
+- CLI: `gitcoffer check <vault-directory>` — the three-state probe from
+  the 1.1.0 plan, in the style of git-remote-gcrypt's --check: exit 0
+  the vault opens with the passphrase, 1 the path holds a vault that
+  does not open (wrong passphrase or damage), 100 not a vault or
+  unreachable. Serving an older manifest generation prints a warning
+  but still exits 0 — a recoverable vault must not read as missing. The
+  user guide's Maintenance section gained the scheduling recipe: cron
+  and Task Scheduler lines that feed the passphrase from a
+  permission-protected file, with the honest note about what that file
+  grants.
 
 - Versioning convention: a.b.c with positive integers — a is the major
   direction, b the minor direction (its goals are written down before

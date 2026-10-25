@@ -236,6 +236,7 @@ On the drive: one new folder. Nothing else changed.
 | `gitcoffer gc [--prune] <dir>` | report reclaimable space, or reclaim it with `--prune` |
 | `gitcoffer fsck <dir>` | verify every structure of the vault |
 | `gitcoffer doctor <dir>` | check the environment and the vault |
+| `gitcoffer check <dir>` | probe a vault from a script — exit 0 opens, 1 vault that does not open, 100 not a vault |
 | `gitcoffer export-bundle <dir> <file>` | export the vault as a plain git bundle — the exit path |
 | `gitcoffer version [--json]` | print the build version (optionally as JSON) |
 | `gitcoffer completion <shell>` | print a completion script for bash, zsh, fish, or powershell |

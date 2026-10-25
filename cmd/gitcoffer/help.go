@@ -109,6 +109,18 @@ example the FAT-family 4 GiB single-file cap), leftover locks and temp
 files. Failures exit non-zero; warnings do not.`,
 	},
 	{
+		name:    "check",
+		summary: "probe a vault for scripts (exit 0 / 1 / 100)",
+		detail: `Prompts for the passphrase, then answers one question: does
+the vault open? The answer is the exit code — 0 the vault opened, 1 the
+path holds a vault that does not open (wrong passphrase or damage), 100
+not a vault or unreachable (a drive can be unplugged). Serving an older
+manifest generation prints a warning but still exits 0: a recoverable
+vault must not read as missing. fsck verifies every structure; check
+only proves the vault opens. The user guide's Maintenance section has
+the cron and Task Scheduler recipes.`,
+	},
+	{
 		name:    "export-bundle",
 		summary: "export the vault as a plain git bundle",
 		detail: `Prompts for the passphrase, then decrypts the vault into
@@ -154,7 +166,7 @@ func findCommandDoc(name string) *commandDoc {
 // helpUsage is the invocation line shown for one command.
 func helpUsage(name string) string {
 	switch name {
-	case "init", "status", "rekey", "fsck", "doctor":
+	case "init", "status", "rekey", "fsck", "doctor", "check":
 		return "gitcoffer " + name + " <vault-directory>"
 	case "key":
 		return "gitcoffer key add [-keyfile <path>] <vault-directory>\n    " +
