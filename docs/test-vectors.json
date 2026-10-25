@@ -19,6 +19,12 @@
     "payload": "{\"version\":1,\"refs\":{}}",
     "expected_record": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABPlar1JLEX50QFf1iGFw3yi8F4E5wmNYu+Bvk5hKMN87rSjlRvdS1"
   },
+  "manifest_v2": {
+    "nonce": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH",
+    "generation": 2,
+    "payload": "{\"version\":1,\"refs\":{}}",
+    "expected_record": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH8Q2dTU7KQqKyNM5bWvDzGhip1z0MQozNmi1uPfmX4GGlLOEDrRVR"
+  },
   "obj_chunk": {
     "file": "deadbeefdeadbeefdeadbeefdeadbeef",
     "chunk": 0,

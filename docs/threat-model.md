@@ -52,7 +52,11 @@ and, as importantly, what it does not.
   consistent generation. Retaining several manifest generations
   (`generations.kept`, default 2) makes rollback *visible* to
   `gitcoffer fsck` when compared against remembered state, but Coffer does not
-  provide trusted timestamping.
+  provide trusted timestamping. On format v2 (1.1.0+) re-filing an older
+  manifest's bytes under a newer generation's name is *rejected* — the
+  generation number is part of the manifest's authentication — so the
+  rollback that survives is plain truncation, which the `prev` chain
+  still surfaces as a diagnostic.
 
 ## Metadata leakage (known, accepted)
 

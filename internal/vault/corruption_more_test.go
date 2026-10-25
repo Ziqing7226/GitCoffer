@@ -85,7 +85,10 @@ func TestTruncatedStructuresFailPrecisely(t *testing.T) {
 
 func TestGenerationRollbackIsDetected(t *testing.T) {
 	dir := t.TempDir()
-	s, _ := storeWithObject(t, dir, "pass")
+	// A v1 vault: there, a byte-copied generation still opens and the
+	// chain check is what flags it. (v2 rejects the copy at
+	// authentication — covered by TestRollbackRefilingV1SilentV2Rejected.)
+	s, _ := storeWithObjectV1(t, dir, "pass")
 
 	// Commit twice so several generations exist, then re-file the OLDEST
 	// generation under the highest number: the rollback an attacker with

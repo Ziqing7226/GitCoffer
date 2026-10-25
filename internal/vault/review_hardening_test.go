@@ -139,21 +139,14 @@ func TestCommitAbortsWhenTargetGenerationExists(t *testing.T) {
 	s, _ := storeWithObject(t, dir, "pass")
 
 	// Simulate a writer that committed past us after a lock theft: the
-	// next generation number is already taken on disk.
+	// next generation number is already taken on disk (sealed for its
+	// own generation — a byte copy would not authenticate on v2).
 	next := s.manifestNum + 1
-	cur := filepath.Join(dir, fmt.Sprintf("%s%d", manifestPrefix, s.manifestNum))
-	foreign := filepath.Join(dir, fmt.Sprintf("%s%d", manifestPrefix, next))
-	data, err := os.ReadFile(cur)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(foreign, data, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	resealFor(t, s, s.manifestNum, next)
 
 	m := s.Manifest()
 	m.Refs["refs/heads/main"] = RefVal{OID: strings.Repeat("a", 40)}
-	err = s.Commit(m)
+	err := s.Commit(m)
 	if err == nil || !strings.Contains(err.Error(), "already exists") {
 		t.Fatalf("commit over an existing generation not aborted: %v", err)
 	}

@@ -44,6 +44,12 @@ type vectorFile struct {
 		Payload        string `json:"payload"` // plaintext, UTF-8
 		ExpectedRecord string `json:"expected_record"`
 	} `json:"manifest"`
+	ManifestV2 struct {
+		Nonce          string `json:"nonce"`
+		Generation     int    `json:"generation"`
+		Payload        string `json:"payload"`
+		ExpectedRecord string `json:"expected_record"`
+	} `json:"manifest_v2"`
 	Chunk struct {
 		File      string `json:"file"` // 32 hex chars
 		Chunk     int    `json:"chunk"`
@@ -89,6 +95,8 @@ const (
 	vecChain1Payload = `{"version":1,"prev":null,"refs":{}}`
 	vecChain2Nonce   = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAF"
 	vecChain2Payload = `{"version":1,"prev":"<sha256 of payload1>","refs":{}}`
+	vecMan2Nonce     = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAH"
+	vecMan2Payload   = `{"version":1,"refs":{}}`
 	vecFile          = "deadbeefdeadbeefdeadbeefdeadbeef"
 	vecChunkPT       = "coffer format v1 test vector payload\n"
 )
@@ -162,6 +170,23 @@ func TestFormatVectors(t *testing.T) {
 	}
 	if got := base64.StdEncoding.EncodeToString(record); got != v.Manifest.ExpectedRecord {
 		t.Fatalf("manifest record mismatch:\n got %s\nwant %s", got, v.Manifest.ExpectedRecord)
+	}
+	// v2 manifest record: the generation number rides in the AAD, so the
+	// same bytes must NOT open under any other generation — that is the
+	// rollback rejection v2 exists for.
+	m2Nonce, _ := base64.StdEncoding.DecodeString(v.ManifestV2.Nonce)
+	record2, err := sealManifestV2(vectorDEK(t), v.VaultID, v.ManifestV2.Generation, []byte(v.ManifestV2.Payload), m2Nonce)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := base64.StdEncoding.EncodeToString(record2); got != v.ManifestV2.ExpectedRecord {
+		t.Fatalf("v2 manifest record mismatch:\n got %s\nwant %s", got, v.ManifestV2.ExpectedRecord)
+	}
+	if payload, err := OpenManifestV2(vectorDEK(t), v.VaultID, v.ManifestV2.Generation, record2); err != nil || string(payload) != v.ManifestV2.Payload {
+		t.Fatalf("v2 manifest round-trip failed: %v %q", err, payload)
+	}
+	if _, err := OpenManifestV2(vectorDEK(t), v.VaultID, v.ManifestV2.Generation+1, record2); err == nil {
+		t.Fatal("v2 manifest opened under a foreign generation: rollback rejection broken")
 	}
 	if _, err := OpenManifest(vectorDEK(t), v.VaultID, record); err != nil {
 		t.Fatalf("vector manifest does not open: %v", err)
@@ -258,6 +283,13 @@ func TestWriteFormatVectors(t *testing.T) {
 	v.Manifest.Nonce = vecManNonce
 	v.Manifest.Payload = `{"version":1,"refs":{}}`
 	v.Manifest.ExpectedRecord = base64.StdEncoding.EncodeToString(record)
+	man2Nonce, _ := base64.StdEncoding.DecodeString(vecMan2Nonce)
+	recMan2, err := sealManifestV2(vectorDEK(t), vecVaultID, 2, []byte(vecMan2Payload), man2Nonce)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v.ManifestV2.Nonce, v.ManifestV2.Generation, v.ManifestV2.Payload = vecMan2Nonce, 2, vecMan2Payload
+	v.ManifestV2.ExpectedRecord = base64.StdEncoding.EncodeToString(recMan2)
 	v.Chunk.File, v.Chunk.Chunk, v.Chunk.Nonce = vecFile, 0, vecChunkNonce
 	v.Chunk.Plaintext = vecChunkPT
 	v.Chunk.Expected = base64.StdEncoding.EncodeToString(buf.Bytes())

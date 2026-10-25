@@ -238,6 +238,7 @@ unchanged. The on-disk format is specified and frozen in
 | `gitcoffer doctor <dir>` | check the environment and the vault, and report |
 | `gitcoffer check <dir>` | probe a vault from a script (exit 0 opens, 1 does not open, 100 not a vault) |
 | `gitcoffer move <dir> <new-path>` | relocate a vault directory (same-disk moves are atomic; copies are verified before success) |
+| `gitcoffer migrate <dir>` | convert a v1 vault to format v2 in place (one-way: binaries older than 1.1.0 then refuse it) |
 | `gitcoffer export-bundle <dir> <file>` | export the vault as a plain git bundle |
 | `gitcoffer version [--json]` | print the build version (optionally as JSON) |
 | `gitcoffer completion <shell>` | print a completion script for bash, zsh, fish, or powershell |
@@ -394,6 +395,30 @@ vaults move without any caveat.
 Host↔vault relocations are a different operation (moving a project to or
 from GitHub): those are the plain-git migration steps in the README, not
 this command.
+
+### Upgrading a vault to format v2
+
+Format v2 changes one thing: each manifest's authentication is bound to
+its generation number, so a rolled-back manifest (an older generation's
+bytes re-filed under a newer generation's name) is rejected instead of
+warned about. Everything else — structures, key slots, object files — is
+identical. New vaults are created on v2 directly; `migrate` is for
+vaults made by older versions:
+
+```bash
+gitcoffer migrate "/mnt/usb/myproject.coffer"
+```
+
+The command asks for confirmation; a script passes `-yes`. fsck must
+pass first, and the vault never leaves its directory: only vault.meta
+and the manifest generations are rewritten — object data is untouched,
+disk usage does not double, clones keep their URLs. An interrupted
+migration is finished by running the command again.
+
+The upgrade is one-way: binaries older than 1.1.0 — including 1.0.0 —
+refuse a v2 vault with an explicit version error. On a drive you hand to
+another machine, migrate only when that machine runs GitCoffer 1.1.0 or
+newer. `status` and `doctor` print a hint on v1 vaults.
 
 ## Troubleshooting
 

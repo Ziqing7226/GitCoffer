@@ -140,6 +140,8 @@ func main() {
 		err = checkCmd(os.Args[2:])
 	case "move":
 		err = moveCmd(os.Args[2:])
+	case "migrate":
+		err = migrateCmd(os.Args[2:])
 	case "export-bundle":
 		err = exportBundleCmd(os.Args[2:])
 	case "help", "-h", "--help":
@@ -200,6 +202,7 @@ func usage() {
   gitcoffer doctor <vault-directory>            check the environment and the vault, and report
   gitcoffer check <vault-directory>             probe for scripts: 0 opens, 1 vault that does not open, 100 not a vault
   gitcoffer move <vault-dir> <new-path>         relocate a vault directory (source is never modified)
+  gitcoffer migrate [-yes] <vault-dir>          convert a v1 vault to format v2 in place (one-way)
   gitcoffer export-bundle <vault-dir> <file>    export the vault as a plain git bundle
   gitcoffer version [--json]                    print the build version
   gitcoffer completion <bash|zsh|fish|powershell>
@@ -280,6 +283,9 @@ func statusCmd(args []string) error {
 	}
 	fmt.Printf("vault: %s\n  format: v%d\n  id: %s\n  created: %s\n  key slots: %d\n",
 		dir, meta.FormatVersion, meta.ID, meta.Created.Format("2006-01-02 15:04:05 MST"), len(meta.Slots))
+	if meta.FormatVersion < crypto.CurrentFormatVersion {
+		fmt.Println("  [hint] this vault is on format v1 — `gitcoffer migrate` upgrades it to v2, in place (one-way: binaries older than 1.1.0 then refuse this vault)")
+	}
 	fmt.Printf("  manifest generations on disk: %s\n", generationList(vault.GenerationNums(dir)))
 
 	pass, err := promptPassword("Passphrase")

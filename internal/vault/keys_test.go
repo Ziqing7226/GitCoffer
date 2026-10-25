@@ -16,8 +16,19 @@ import (
 // storeWithObject creates a vault with one committed, referenced object
 // file, and returns the opened store plus the object's name.
 func storeWithObject(t *testing.T, dir, pass string) (*Store, string) {
+	return storeWithObjectFormat(t, dir, pass, crypto.CurrentFormatVersion)
+}
+
+// storeWithObjectV1 is storeWithObject on a v1 vault, for tests pinning
+// v1-era semantics (a byte-copied generation opens there and is flagged
+// by the chain check, not by authentication).
+func storeWithObjectV1(t *testing.T, dir, pass string) (*Store, string) {
+	return storeWithObjectFormat(t, dir, pass, crypto.FormatVersion)
+}
+
+func storeWithObjectFormat(t *testing.T, dir, pass string, formatVersion int) (*Store, string) {
 	t.Helper()
-	s, err := Create(dir, pass, weakParams())
+	s, err := CreateFormat(dir, pass, weakParams(), formatVersion)
 	if err != nil {
 		t.Fatal(err)
 	}

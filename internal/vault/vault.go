@@ -176,9 +176,9 @@ func ReadMeta(dir string) (Meta, error) {
 	if err := json.Unmarshal(data, &m); err != nil {
 		return Meta{}, fmt.Errorf("%w: %s is malformed: %v", ErrNotVault, metaName, err)
 	}
-	if m.FormatVersion != crypto.FormatVersion {
-		return Meta{}, fmt.Errorf("vault format version %d not supported by this build (supports %d)",
-			m.FormatVersion, crypto.FormatVersion)
+	if m.FormatVersion != crypto.FormatVersion && m.FormatVersion != crypto.FormatVersionV2 {
+		return Meta{}, fmt.Errorf("vault format version %d not supported by this build (supports %d and %d)",
+			m.FormatVersion, crypto.FormatVersion, crypto.FormatVersionV2)
 	}
 	if !isHexID(m.ID) {
 		return Meta{}, fmt.Errorf("%w: %s carries a malformed vault id", ErrCorrupt, metaName)
@@ -204,9 +204,17 @@ func isHexID(s string) bool {
 	return true
 }
 
-// Create initializes a new vault at dir: one key slot sealed with passphrase,
-// and generation 1 holding an empty manifest.
+// Create initializes a new vault at dir in the current format: one key
+// slot sealed with passphrase, and generation 1 holding an empty manifest.
 func Create(dir, passphrase string, params crypto.Argon2Params) (*Store, error) {
+	return CreateFormat(dir, passphrase, params, crypto.CurrentFormatVersion)
+}
+
+// CreateFormat initializes a new vault in a specific format version
+// (crypto.FormatVersion for v1 — what 1.0.0 wrote — or
+// crypto.FormatVersionV2). Migration tests and fixture regeneration build
+// v1 vaults with it.
+func CreateFormat(dir, passphrase string, params crypto.Argon2Params, formatVersion int) (*Store, error) {
 	if err := os.MkdirAll(filepath.Join(dir, objDirName), 0o700); err != nil {
 		return nil, err
 	}
@@ -238,7 +246,7 @@ func Create(dir, passphrase string, params crypto.Argon2Params) (*Store, error) 
 		return nil, err
 	}
 	meta := Meta{
-		FormatVersion: crypto.FormatVersion,
+		FormatVersion: formatVersion,
 		ID:            id,
 		Created:       time.Now().UTC(),
 		Slots:         []crypto.Slot{*slot},
@@ -337,7 +345,18 @@ func (s *Store) readManifestNum(n int) (*Manifest, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	payload, err := crypto.OpenManifest(s.dek, s.meta.ID, data)
+	var payload []byte
+	if s.meta.FormatVersion == crypto.FormatVersionV2 {
+		// v2 manifests bind their generation into the AAD. A v2 vault may
+		// still hold v1-sealed generations until `gitcoffer migrate`
+		// finishes resealing them (meta flips to v2 first, so this window
+		// is readable) — fall back to the v1 seal for those.
+		if payload, err = crypto.OpenManifestV2(s.dek, s.meta.ID, n, data); err != nil {
+			payload, err = crypto.OpenManifest(s.dek, s.meta.ID, data)
+		}
+	} else {
+		payload, err = crypto.OpenManifest(s.dek, s.meta.ID, data)
+	}
 	if err != nil {
 		return nil, "", err
 	}
@@ -560,11 +579,16 @@ func (s *Store) commit(next *Manifest) error {
 		}
 	}
 	s.crashPoint("before-manifest-commit")
-	record, err := crypto.SealManifest(s.dek, s.meta.ID, payload)
+	newNum := s.manifestNum + 1
+	var record []byte
+	if s.meta.FormatVersion == crypto.FormatVersionV2 {
+		record, err = crypto.SealManifestV2(s.dek, s.meta.ID, newNum, payload)
+	} else {
+		record, err = crypto.SealManifest(s.dek, s.meta.ID, payload)
+	}
 	if err != nil {
 		return err
 	}
-	newNum := s.manifestNum + 1
 	tmp := filepath.Join(s.dir, fmt.Sprintf("%s%d.tmp", manifestPrefix, newNum))
 	tf, err := createNoFollow(tmp)
 	if err != nil {

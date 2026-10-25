@@ -51,7 +51,29 @@
   target sits on an online or synced filesystem. The guide's
   Maintenance section documents the whole flow, including the key-file
   caveat.
-
+- Format v2: the manifest AAD additionally binds the generation number
+  ("coffer/2/manifest/<id>/<generation>"), so refiling an older
+  manifest's ciphertext under a newer generation's name now fails
+  authentication — rollback becomes a rejection instead of a fsck-time
+  warning. Structures and slot crypto are unchanged from v1; a v2
+  manifest read tolerates v1-sealed generations so an interrupted
+  migration stays readable (meta flips to v2 first, then each
+  generation is resealed; the prev chain hashes the plaintext, so
+  resealing leaves it intact). New vaults are created on v2. 1.0.0
+  binaries refuse a v2 vault at vault.meta with the explicit
+  unsupported-version error — the one-way door the migration command
+  states before acting. The grammar leaves room for the recorded
+  format-v2 candidates (unknown slot input types and manifest fields
+  are skipped by this build's reader) so public-key slots can land
+  without a v3.
+- CLI: `gitcoffer migrate [-yes] <vault-directory>` — the explicit,
+  in-place v1→v2 conversion: fsck must pass first, the writer lock is
+  held throughout, only meta and manifests are rewritten with the same
+  write-temp-and-rename atomicity rekey uses, the result is reopened
+  and fscked before success is reported, and an interrupted run is
+  finished by running it again. Confirmation is required (or `-yes`
+  for scripts); `status` and `doctor` print an upgrade hint on v1
+  vaults. Conformance vectors pin the v2 manifest seal.
 - Versioning convention: a.b.c with positive integers — a is the major
   direction, b the minor direction (its goals are written down before
   work starts), c the rc counter of the current direction; candidates

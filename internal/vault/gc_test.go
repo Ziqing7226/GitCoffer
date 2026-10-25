@@ -97,18 +97,11 @@ func TestGCDryRunReportsPrunableGenerations(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Simulate drift: a generation beyond the kept bound left on disk
-	// (e.g. assembled from copies). Dry-run must report it without
-	// deleting; a real pass must delete it.
-	pristine := filepath.Join(dir, "manifest.2")
+	// Simulate drift: a generation beyond the kept bound left on disk.
+	// It must be sealed for its own generation — copying another
+	// generation's bytes no longer authenticates on a v2 vault.
 	drifted := filepath.Join(dir, "manifest.1")
-	data, err := os.ReadFile(pristine)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(drifted, data, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	resealFor(t, s, 2, 1)
 
 	dry, err := GCDryRun(dir, "pass")
 	if err != nil {

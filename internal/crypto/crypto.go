@@ -17,8 +17,20 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 )
 
-// FormatVersion is the on-disk format version implemented by this package.
+// FormatVersion is the v1 on-disk format: vaults written by 1.0.0.
 const FormatVersion = 1
+
+// FormatVersionV2 is the v2 format, written by 1.1.0+ for new vaults and
+// by `gitcoffer migrate`. The structures and the slot crypto are
+// unchanged from v1 — the one difference is the manifest AAD, which in
+// v2 additionally binds the manifest's generation number, so an older
+// manifest's ciphertext cannot be re-filed under a newer generation's
+// name without failing authentication (rollback rejection instead of
+// rollback detection).
+const FormatVersionV2 = 2
+
+// CurrentFormatVersion is the format new vaults get.
+const CurrentFormatVersion = FormatVersionV2
 
 // Algorithm and size constants per the format specification.
 const (
@@ -275,6 +287,53 @@ func OpenManifest(dek []byte, vaultID string, record []byte) ([]byte, error) {
 		return nil, err
 	}
 	payload, err := aead.Open(nil, record[:NonceSize], record[NonceSize:], AAD("manifest", vaultID))
+	if err != nil {
+		return nil, ErrAuth
+	}
+	return payload, nil
+}
+
+// ManifestAADv2 builds the v2 manifest AAD: the v1 role binding plus the
+// generation number. Binding the generation turns refiling attacks into
+// authentication failures — copy manifest.2's bytes over manifest.3 and
+// the record no longer opens under generation 3.
+func ManifestAADv2(vaultID string, generation int) []byte {
+	return []byte(fmt.Sprintf("coffer/%d/manifest/%s/%d", FormatVersionV2, vaultID, generation))
+}
+
+// SealManifestV2 encrypts a manifest payload for generation `generation`
+// of a v2 vault. The result is nonce || ciphertext, like v1.
+func SealManifestV2(dek []byte, vaultID string, generation int, payload []byte) ([]byte, error) {
+	nonce, err := RandomBytes(NonceSize)
+	if err != nil {
+		return nil, err
+	}
+	return sealManifestV2(dek, vaultID, generation, payload, nonce)
+}
+
+// sealManifestV2 seals with a caller-supplied nonce; the format test
+// vectors pin exact bytes with fixed nonces.
+func sealManifestV2(dek []byte, vaultID string, generation int, payload []byte, nonce []byte) ([]byte, error) {
+	if len(nonce) != NonceSize {
+		return nil, fmt.Errorf("manifest seal nonce must be %d bytes", NonceSize)
+	}
+	aead, err := newAEAD(dek)
+	if err != nil {
+		return nil, err
+	}
+	return append(nonce, aead.Seal(nil, nonce, payload, ManifestAADv2(vaultID, generation))...), nil
+}
+
+// OpenManifestV2 decrypts a v2 manifest record for `generation`.
+func OpenManifestV2(dek []byte, vaultID string, generation int, record []byte) ([]byte, error) {
+	if len(record) < NonceSize+TagSize {
+		return nil, fmt.Errorf("manifest record too short")
+	}
+	aead, err := newAEAD(dek)
+	if err != nil {
+		return nil, err
+	}
+	payload, err := aead.Open(nil, record[:NonceSize], record[NonceSize:], ManifestAADv2(vaultID, generation))
 	if err != nil {
 		return nil, ErrAuth
 	}

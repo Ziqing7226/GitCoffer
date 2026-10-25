@@ -210,3 +210,48 @@ first follow the same formula with their index in the AAD (§5). The
 reference implementation verifies the vectors in
 `internal/crypto/vectors_test.go` on every test run; regenerate the file
 only through a deliberate spec change, never to make a failing build pass.
+
+## 9. Format v2 (delta from v1)
+
+Format v2 (written by 1.1.0+) is v1 with one change, defined so a v2
+vault is byte-readable by this grammar and refused cleanly by v1-only
+readers:
+
+- `vault.meta` carries `"format_version": 2`. Per §3, a reader MUST
+  refuse an unknown `format_version` — so a 1.0.0 binary refuses a v2
+  vault at the header with an explicit version error, before touching
+  any encrypted structure. This is the one-way door `gitcoffer migrate`
+  states before acting.
+- The manifest AAD additionally binds the generation number:
+
+  ```text
+  manifest.<n> = 24-byte nonce || AEAD(JSON payload, DEK, nonce,
+                 AAD("coffer/2/manifest/<vault id>/<n>"))
+  ```
+
+  Everything else about manifests is unchanged (§4): same payload
+  schema, same `prev` chain (which hashes the plaintext payload, so
+  resealing does not disturb it), same numbering and retention. The
+  generation in the AAD means an older manifest's ciphertext re-filed
+  under a newer generation's name FAILS authentication — rollback
+  becomes a rejection, not a fsck-time warning. Deleting the newest
+  generation outright is not affected (nothing offline can detect
+  truncation without an external anchor; the `prev` chain remains the
+  diagnostic).
+- Key slots, object files, chunk framing, write ordering (§6), and
+  tamper semantics (§7) are identical to v1. A v2 vault's DEK is the
+  same DEK; migration rewrites only `vault.meta` and the manifest
+  generations, never object data.
+- During migration, a v2 vault MAY temporarily hold v1-sealed
+  generations: `vault.meta` flips to 2 first, then each generation is
+  resealed. A v2 reader MUST therefore attempt the v2 AAD first and fall
+  back to the v1 AAD (`"coffer/1/manifest/<vault id>"`) per manifest
+  file. Writers MUST always seal per the vault's declared version.
+
+Extensibility: per §3, readers ignore unrecognized JSON fields and skip
+slots whose `input` they do not implement. Future format-v2 work —
+per-writer identity wrapping, public-key slots — MUST extend through
+those rules rather than a v3, so v2 stays the compatibility floor.
+
+Test vectors: §8's file pins the v2 manifest seal (`manifest_v2`),
+including that the record does NOT open under a foreign generation.

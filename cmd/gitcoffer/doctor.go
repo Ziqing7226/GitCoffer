@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Ziqing7226/GitCoffer/internal/crypto"
 	"github.com/Ziqing7226/GitCoffer/internal/vault"
 )
 
@@ -34,6 +35,10 @@ func (d *diag) warn(format string, args ...any) {
 func (d *diag) fail(format string, args ...any) {
 	d.failed = true
 	fmt.Printf("[fail] "+format+"\n", args...)
+}
+
+func (d *diag) hint(format string, args ...any) {
+	fmt.Printf("[hint] "+format+"\n", args...)
 }
 
 func doctorCmd(args []string) error {
@@ -78,6 +83,9 @@ func doctorCmd(args []string) error {
 		d.fail("vault.meta unreadable: %v", err)
 	default:
 		d.ok("vault.meta valid: format v%d, id %s, %d key slot(s)", meta.FormatVersion, meta.ID, len(meta.Slots))
+		if meta.FormatVersion < crypto.CurrentFormatVersion {
+			d.hint("this vault is on format v1 — `gitcoffer migrate` upgrades it to v2, in place (one-way: binaries older than 1.1.0 then refuse this vault)")
+		}
 		for _, sl := range meta.Slots {
 			if sl.Input != "passphrase+keyfile" || sl.Keyfile == "" {
 				continue

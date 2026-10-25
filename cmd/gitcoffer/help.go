@@ -141,6 +141,26 @@ online or synced filesystem (network share, cloud folder) gets a word
 of caution.`,
 	},
 	{
+		name:    "migrate",
+		summary: "convert a v1 vault to format v2, in place",
+		detail: `Converts a v1 vault to format v2 without leaving the directory:
+only vault.meta and the manifest generations are rewritten — object data
+is untouched, so nothing is re-encrypted, disk usage does not double,
+and clones keep their URLs. v2 binds each manifest's generation number
+into its authentication, so a rolled-back manifest is rejected instead
+of warned about.
+
+fsck must pass first; damaged vaults get repaired, not migrated. An
+interrupted migration is finished by running the command again.
+
+This is a one-way door: binaries older than 1.1.0 — including 1.0.0 —
+refuse a v2 vault. On a drive you hand to another machine, migrate only
+when that machine runs 1.1.0 or newer. The command asks for
+confirmation; a non-interactive run needs -yes after reading the
+warning. New vaults are created on v2 directly, so this command is only
+for vaults made by older versions.`,
+	},
+	{
 		name:    "export-bundle",
 		summary: "export the vault as a plain git bundle",
 		detail: `Prompts for the passphrase, then decrypts the vault into
@@ -190,6 +210,8 @@ func helpUsage(name string) string {
 		return "gitcoffer " + name + " <vault-directory>"
 	case "move":
 		return "gitcoffer move <vault-directory> <new-path>"
+	case "migrate":
+		return "gitcoffer migrate [-yes] <vault-directory>"
 	case "key":
 		return "gitcoffer key add [-keyfile <path>] <vault-directory>\n    " +
 			"gitcoffer key remove <vault-directory> <slot-id>\n    " +
