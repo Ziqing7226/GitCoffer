@@ -89,7 +89,7 @@ func checkCmd(args []string) error {
 		fmt.Println(msg)
 		os.Exit(checkNotVaultCode)
 	}
-	pass, err := promptPassword("Passphrase")
+	_, pass, err := openVaultInteractive(dir)
 	if err != nil {
 		return err
 	}

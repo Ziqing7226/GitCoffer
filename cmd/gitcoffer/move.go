@@ -107,7 +107,7 @@ func moveCmd(args []string) error {
 
 	// Cross-filesystem: verify the source opens, freeze writers, copy,
 	// then verify the copy end to end before claiming success.
-	pass, err := promptPassword("Passphrase")
+	_, pass, err := openVaultInteractive(src)
 	if err != nil {
 		return err
 	}

@@ -354,3 +354,8 @@ func Hash(data []byte) string {
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
 }
+
+// ValidateParams checks Argon2id parameters against the format's bounds
+// (the ceilings that keep a planted vault.meta from grinding unbounded
+// work). CLI cost selection uses it to fail before prompting.
+func ValidateParams(p Argon2Params) error { return p.validate() }

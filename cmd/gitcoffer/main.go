@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Ziqing7226/GitCoffer/internal/bundle"
 	"github.com/Ziqing7226/GitCoffer/internal/crypto"
@@ -143,6 +144,8 @@ func main() {
 		err = moveCmd(os.Args[2:])
 	case "migrate":
 		err = migrateCmd(os.Args[2:])
+	case "backoff":
+		err = backoffCmd(os.Args[2:])
 	case "export-bundle":
 		err = exportBundleCmd(os.Args[2:])
 	case "help", "-h", "--help":
@@ -204,6 +207,7 @@ func usage() {
   gitcoffer check <vault-directory>             probe for scripts: 0 opens, 1 vault that does not open, 100 not a vault
   gitcoffer move <vault-dir> <new-path>         relocate a vault directory (source is never modified)
   gitcoffer migrate [-yes] <vault-dir>          convert a v1 vault to format v2 in place (one-way)
+  gitcoffer backoff <on|off> <vault-dir>        toggle the interactive wrong-passphrase delay (needs the passphrase)
   gitcoffer export-bundle <vault-dir> <file>    export the vault as a plain git bundle
   gitcoffer version [--json]                    print the build version
   gitcoffer completion <bash|zsh|fish|powershell>
@@ -289,11 +293,7 @@ func statusCmd(args []string) error {
 	}
 	fmt.Printf("  manifest generations on disk: %s\n", generationList(vault.GenerationNums(dir)))
 
-	pass, err := promptPassword("Passphrase")
-	if err != nil {
-		return err
-	}
-	s, err := vault.Open(dir, pass)
+	s, _, err := openVaultInteractive(dir)
 	if err != nil {
 		return err
 	}
@@ -378,11 +378,57 @@ func promptNewPassword() (string, error) {
 
 // openWithPrompt opens a vault after prompting for its passphrase.
 func openWithPrompt(dir string) (*vault.Store, error) {
-	pass, err := promptPassword("Passphrase")
-	if err != nil {
-		return nil, err
+	s, _, err := openVaultInteractive(dir)
+	return s, err
+}
+
+// openVaultInteractive opens a vault after prompting, honoring the
+// vault's opt-in interactive backoff: with it on and a human at the
+// terminal, a wrong passphrase re-prompts with a progressive delay —
+// anti-casual only. Anything else keeps the classic single shot.
+func openVaultInteractive(dir string) (*vault.Store, string, error) {
+	retry := vault.BackoffEnabled(dir) && term.IsTerminal(int(os.Stdin.Fd()))
+	return openWithRetries(dir, retry, realBackoffDelay)
+}
+
+// openWithRetries prompts up to three attempts. Only authentication
+// failures retry — a damaged vault or an input error fails once, as
+// before. delay runs between attempts (its argument is the attempt
+// number about to start); tests inject a no-op.
+func openWithRetries(dir string, retry bool, delay func(attempt int)) (*vault.Store, string, error) {
+	const attempts = 3
+	var pass string
+	var lastErr error
+	for try := 1; try <= attempts; try++ {
+		if try > 1 {
+			fmt.Fprintf(os.Stderr, "wrong passphrase (attempt %d of %d)\n", try-1, attempts)
+			if retry {
+				delay(try)
+			}
+		}
+		var err error
+		pass, err = promptPassword("Passphrase")
+		if err != nil {
+			return nil, "", err
+		}
+		s, err := vault.Open(dir, pass)
+		if err == nil {
+			return s, pass, nil
+		}
+		lastErr = err
+		if !retry || !errors.Is(err, crypto.ErrAuth) {
+			return nil, "", err
+		}
 	}
-	return vault.Open(dir, pass)
+	return nil, "", lastErr
+}
+
+// realBackoffDelay sleeps (attempt-1)^2 seconds — 1s before the second
+// attempt, 4s before the third.
+func realBackoffDelay(attempt int) {
+	d := time.Duration(attempt-1) * time.Duration(attempt-1) * time.Second
+	fmt.Fprintf(os.Stderr, "waiting %s before the next prompt (interactive backoff)\n", d)
+	time.Sleep(d)
 }
 
 func vaultDirArg(fs *flag.FlagSet) string {
@@ -395,8 +441,9 @@ func vaultDirArg(fs *flag.FlagSet) string {
 
 func rekeyCmd(args []string) error {
 	fs := flag.NewFlagSet("rekey", flag.ContinueOnError)
+	kdf := fs.String("kdf", "", "Argon2id cost for the re-sealed slot, m=<KiB>,t=<iterations>,p=<lanes> (subset allowed; default m=65536,t=3,p=4)")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: gitcoffer rekey <vault-directory>")
+		fmt.Fprintln(os.Stderr, "usage: gitcoffer rekey [-kdf m=…,t=…,p=…] <vault-directory>")
 		fmt.Fprintln(os.Stderr, usageHint("rekey"))
 		fs.PrintDefaults()
 	}
@@ -413,7 +460,12 @@ func rekeyCmd(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := s.Rekey(newPass); err != nil {
+	params, err := parseKDFParams(*kdf)
+	if err != nil {
+		return err
+	}
+	warnIfWeakerThanDefault(params)
+	if err := s.RekeyParams(newPass, params); err != nil {
 		return err
 	}
 	fmt.Printf("Passphrase replaced for slot %d — vault.meta rewritten, object data untouched\n", s.OpenedSlotID())
@@ -424,8 +476,9 @@ func rekeyCmd(args []string) error {
 func keyAddCmd(args []string) error {
 	fs := flag.NewFlagSet("key add", flag.ContinueOnError)
 	keyfile := fs.String("keyfile", "", "require this key file in addition to the passphrase (created with random bytes if missing)")
+	kdf := fs.String("kdf", "", "Argon2id cost for the new slot, m=<KiB>,t=<iterations>,p=<lanes> (subset allowed; default m=65536,t=3,p=4)")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: gitcoffer key add [-keyfile <path>] <vault-directory>")
+		fmt.Fprintln(os.Stderr, "usage: gitcoffer key add [-keyfile <path>] [-kdf m=…,t=…,p=…] <vault-directory>")
 		fmt.Fprintln(os.Stderr, usageHint("key add"))
 		fs.PrintDefaults()
 	}
@@ -442,9 +495,14 @@ func keyAddCmd(args []string) error {
 	if err != nil {
 		return err
 	}
+	params, err := parseKDFParams(*kdf)
+	if err != nil {
+		return err
+	}
+	warnIfWeakerThanDefault(params)
 	_, statErr := os.Stat(*keyfile)
 	created := *keyfile != "" && statErr != nil
-	id, err := s.AddSlot(newPass, *keyfile)
+	id, err := s.AddSlotParams(newPass, *keyfile, params)
 	if err != nil {
 		return err
 	}
@@ -510,6 +568,9 @@ func keyListCmd(args []string) error {
 		return err
 	}
 	fmt.Printf("vault %s — %d key slot(s):\n", meta.ID, len(meta.Slots))
+	if meta.Backoff {
+		fmt.Println("  interactive backoff: on (gitcoffer's own prompts re-ask with a delay after wrong attempts — terminals only)")
+	}
 	for _, sl := range meta.Slots {
 		input := "passphrase"
 		keyfile := ""
@@ -537,7 +598,7 @@ func gcCmd(args []string) error {
 	}
 	dir := vaultDirArg(fs)
 
-	pass, err := promptPassword("Passphrase")
+	_, pass, err := openVaultInteractive(dir)
 	if err != nil {
 		return err
 	}
@@ -609,7 +670,7 @@ func fsckCmd(args []string) error {
 	}
 	dir := vaultDirArg(fs)
 
-	pass, err := promptPassword("Passphrase")
+	_, pass, err := openVaultInteractive(dir)
 	if err != nil {
 		return err
 	}
@@ -649,5 +710,50 @@ func humanBytes(n int64) string {
 		return fmt.Sprintf("%.1f KiB", float64(n)/(1<<10))
 	default:
 		return fmt.Sprintf("%d B", n)
+	}
+}
+
+// parseKDFParams parses the -kdf flag: m=<KiB>,t=<iterations>,p=<lanes>,
+// any subset (unspecified fields keep the recommended defaults). The
+// salt is generated per slot at seal time.
+func parseKDFParams(spec string) (crypto.Argon2Params, error) {
+	params := crypto.DefaultParams()
+	if spec == "" {
+		return params, nil
+	}
+	for _, kv := range strings.Split(spec, ",") {
+		k, v, ok := strings.Cut(kv, "=")
+		if !ok {
+			return params, fmt.Errorf("malformed -kdf %q — expected m=<KiB>,t=<iterations>,p=<lanes>", spec)
+		}
+		n, err := strconv.ParseUint(strings.TrimSpace(v), 10, 32)
+		if err != nil {
+			return params, fmt.Errorf("-kdf %s: %v", k, err)
+		}
+		switch strings.TrimSpace(k) {
+		case "m":
+			params.M = uint32(n)
+		case "t":
+			params.T = uint32(n)
+		case "p":
+			params.P = uint32(n)
+		default:
+			return params, fmt.Errorf("unknown -kdf field %q — expected m, t, or p", k)
+		}
+	}
+	if err := crypto.ValidateParams(params); err != nil {
+		return params, fmt.Errorf("kdf parameters out of bounds: %v", err)
+	}
+	return params, nil
+}
+
+// warnIfWeakerThanDefault notes a cost choice below the recommended
+// defaults — a valid choice with a strong passphrase or key file, but
+// not the hardening the flag exists for.
+func warnIfWeakerThanDefault(params crypto.Argon2Params) {
+	def := crypto.DefaultParams()
+	if params.M < def.M || params.T < def.T {
+		fmt.Fprintf(os.Stderr, "note: this slot's Argon2id cost (m=%d KiB, t=%d) is below the recommended default (m=%d, t=%d) — every offline guess against it is cheaper; fine with a strong passphrase or key file, not a hardening choice\n",
+			params.M, params.T, def.M, def.T)
 	}
 }

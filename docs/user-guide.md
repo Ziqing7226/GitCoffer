@@ -239,6 +239,7 @@ unchanged. The on-disk format is specified and frozen in
 | `gitcoffer check <dir>` | probe a vault from a script (exit 0 opens, 1 does not open, 100 not a vault) |
 | `gitcoffer move <dir> <new-path>` | relocate a vault directory (same-disk moves are atomic; copies are verified before success) |
 | `gitcoffer migrate <dir>` | convert a v1 vault to format v2 in place (one-way: binaries older than 1.1.0 then refuse it) |
+| `gitcoffer backoff <on/off> <dir>` | toggle the interactive wrong-passphrase delay (gitcoffer's own prompts; needs the passphrase) |
 | `gitcoffer export-bundle <dir> <file>` | export the vault as a plain git bundle |
 | `gitcoffer version [--json]` | print the build version (optionally as JSON) |
 | `gitcoffer completion <shell>` | print a completion script for bash, zsh, fish, or powershell |
@@ -256,7 +257,20 @@ a second factor; losing it locks out every slot that requires it.
 
 - Rotate your passphrase on a schedule: `gitcoffer rekey` rewrites only the
   tiny `vault.meta` — object data is never re-encrypted, so it is fast at
-  any vault size.
+  any vault size. Both `rekey` and `key add` accept
+  `-kdf m=<KiB>,t=<iterations>,p=<lanes>` to raise the new slot's
+  Argon2id cost: guessing a vault's passphrase is an offline attack, and
+  each derivation is the price of every guess, forever — so the cost is
+  the real hardening (within the supported ceilings; the default is
+  m=65536 KiB, t=3, p=4).
+- `gitcoffer backoff on <vault>` opts the vault into a gentler extra:
+  gitcoffer's own prompts re-ask with a delay (1s, then 4s) after wrong
+  passphrases — for a human at a terminal only. Honest scope: this
+  slows the casual try-it, nothing more; an attacker guessing offline
+  runs their own tools, where nothing we ship can bind them, and any
+  counter stored on the medium can be rewound. There is no lockout and
+  no self-destruct. Toggling prompts for the current passphrase;
+  `gitcoffer key list` shows the state.
 - A rekey makes cached credentials stale. If pushes suddenly fail with
   *authentication failed* after a rekey, clear the cached value:
   `printf 'protocol=coffer\nhost=coffer\npath=<vault id>\n\n' | git credential reject`

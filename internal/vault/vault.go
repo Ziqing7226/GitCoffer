@@ -49,6 +49,13 @@ type Meta struct {
 	ID            string        `json:"id"`
 	Created       time.Time     `json:"created"`
 	Slots         []crypto.Slot `json:"slots"`
+	// Backoff opts this vault into the interactive-attempt backoff:
+	// gitcoffer's own passphrase prompts re-ask with a progressive delay
+	// after wrong attempts, for a human at a terminal. Anti-casual only —
+	// an attacker runs their own tools offline, where nothing here binds
+	// them (the 1.1.0 plan's honest scoping). Optional field, the same
+	// version-free class as the slot extras; older readers ignore it.
+	Backoff bool `json:"backoff,omitempty"`
 }
 
 // RefVal is one advertised ref (spec §4).

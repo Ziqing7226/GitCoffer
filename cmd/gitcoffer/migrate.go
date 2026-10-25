@@ -68,7 +68,7 @@ func migrateCmd(args []string) error {
 		return nil
 	}
 
-	pass, err := promptPassword("Passphrase")
+	_, pass, err := openVaultInteractive(dir)
 	if err != nil {
 		return err
 	}

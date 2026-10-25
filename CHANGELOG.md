@@ -107,6 +107,23 @@
   vaults stay v1, v2 stay v2 — and the guide/threat-model wording about
   deleted history now points at the command instead of a future
   feature.
+- Brute-force resistance options, honestly scoped per the 1.1.0 plan:
+  guessing a vault's passphrase is an offline attack, so the real
+  defenses are passphrase entropy and per-guess cost. (a) `key add` and
+  `rekey` accept `-kdf m=<KiB>,t=<iterations>,p=<lanes>` (subset
+  allowed, defaults m=65536,t=3,p=4, validated against the existing
+  ceilings) — each Argon2id pass is the price of every guess against
+  that slot, forever; a choice below the recommended default prints a
+  note so the flag is never mistaken for hardening in the wrong
+  direction. (b) `gitcoffer backoff on|off <vault>` opts a vault into
+  the interactive-attempt backoff: gitcoffer's own prompts re-ask with
+  a progressive delay (1s, 4s) after wrong passphrases — terminals
+  only, scripts and pipes keep the single classic attempt; only
+  authentication failures retry. Toggling requires the current
+  passphrase (the setting lives in vault.meta as an optional field
+  older binaries ignore). Documented as anti-casual, not
+  anti-attacker; no lockout, no self-destruct. `key list` shows the
+  state.
 - Versioning convention: a.b.c with positive integers — a is the major
   direction, b the minor direction (its goals are written down before
   work starts), c the rc counter of the current direction; candidates

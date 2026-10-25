@@ -13,7 +13,7 @@ import (
 
 const bashCompletion = `# bash completion for gitcoffer
 _gitcoffer() {
-	local commands="init status rekey key gc fsck doctor check move migrate export-bundle version completion help"
+	local commands="init status rekey key gc fsck doctor check move migrate backoff export-bundle version completion help"
 	local gc_opts="--prune --repack" key_opts="--keyfile" ver_opts="--json" global_opts="-h --help"
 	if [[ $COMP_CWORD -eq 1 ]]; then
 		COMPREPLY=( $(compgen -W "$commands" -- "$2") )
@@ -46,6 +46,7 @@ _gitcoffer() {
 		'check:probe a vault for scripts'
 		'move:relocate a vault directory'
 		'migrate:convert a v1 vault to format v2 in place'
+		'backoff:toggle the interactive wrong-passphrase delay'
 		'export-bundle:export the vault as a plain git bundle'
 		'version:print the build version'
 		'completion:print a shell completion script'
@@ -94,6 +95,7 @@ complete -c gitcoffer -n '__fish_use_subcommand' -a doctor -d 'check the environ
 complete -c gitcoffer -n '__fish_use_subcommand' -a check -d 'probe a vault for scripts'
 complete -c gitcoffer -n '__fish_use_subcommand' -a move -d 'relocate a vault directory'
 complete -c gitcoffer -n '__fish_use_subcommand' -a migrate -d 'convert a v1 vault to format v2 in place'
+complete -c gitcoffer -n '__fish_use_subcommand' -a backoff -d 'toggle the interactive wrong-passphrase delay'
 complete -c gitcoffer -n '__fish_use_subcommand' -a export-bundle -d 'export the vault as a plain git bundle'
 complete -c gitcoffer -n '__fish_use_subcommand' -a version -d 'print the build version'
 complete -c gitcoffer -n '__fish_use_subcommand' -a help -d 'print detailed usage'
@@ -109,11 +111,11 @@ const powershellCompletion = `# powershell completion for gitcoffer
 # PowerShell 5.1. Add this block to your $PROFILE.
 Register-ArgumentCompleter -CommandName gitcoffer -Native -ScriptBlock {
 	param($wordToComplete, $commandAst, $cursorPosition)
-	$commands = 'init','status','rekey','key','gc','fsck','doctor','check','move','migrate','export-bundle','version','completion','help'
+	$commands = 'init','status','rekey','key','gc','fsck','doctor','check','move','migrate','backoff','export-bundle','version','completion','help'
 	# Offer subcommands only while completing the token right after
 	# "gitcoffer"; afterwards, offer the subcommand's flags.
 	if ($commandAst.CommandElements.Count -eq 2 -and
-		$commandAst.CommandElements[1].Value -notmatch '^(init|status|rekey|key|gc|fsck|doctor|check|move|migrate|export-bundle|version|completion|help)$') {
+		$commandAst.CommandElements[1].Value -notmatch '^(init|status|rekey|key|gc|fsck|doctor|check|move|migrate|backoff|export-bundle|version|completion|help)$') {
 		$commands | Where-Object { $_ -like "$wordToComplete*" } |
 			ForEach-Object { [System.Management.Automation.CompletionResult]::new($_) }
 		return

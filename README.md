@@ -244,6 +244,7 @@ On the drive: one new folder. Nothing else changed.
 | `gitcoffer check <dir>` | probe a vault from a script — exit 0 opens, 1 vault that does not open, 100 not a vault |
 | `gitcoffer move <dir> <new-path>` | relocate a vault directory to another disk or folder |
 | `gitcoffer migrate <dir>` | convert a v1 vault to format v2 in place (one-way: older binaries then refuse it) |
+| `gitcoffer backoff <on/off> <dir>` | toggle the interactive wrong-passphrase delay (gitcoffer's own prompts; needs the passphrase) |
 | `gitcoffer export-bundle <dir> <file>` | export the vault as a plain git bundle — the exit path |
 | `gitcoffer version [--json]` | print the build version (optionally as JSON) |
 | `gitcoffer completion <shell>` | print a completion script for bash, zsh, fish, or powershell |

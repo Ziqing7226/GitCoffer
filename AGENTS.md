@@ -17,7 +17,8 @@ after fetch/push, HEAD fallback for
 non-main repositories), the `gitcoffer` CLI (init, status, key
 add/remove/list, rekey, gc report-only with --prune, fsck, doctor,
 export-bundle, version --json, completion, self-describing `help`,
-three-state `check` for scripts, vault `move`, in-place v1→v2 `migrate`),
+three-state `check` for scripts, vault `move`, in-place v1→v2 `migrate`,
+interactive `backoff` toggle, per-slot `-kdf` costs),
 CI on Linux, Windows, and
 macOS plus a git 2.30 floor leg, three independent security review
 rounds complete, release workflow (six platforms) and packaging

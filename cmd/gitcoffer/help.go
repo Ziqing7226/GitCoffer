@@ -170,6 +170,23 @@ warning. New vaults are created on v2 directly, so this command is only
 for vaults made by older versions.`,
 	},
 	{
+		name:    "backoff",
+		summary: "toggle the interactive wrong-passphrase delay",
+		detail: `Turns the interactive-attempt backoff on or off; toggling
+prompts for the current passphrase. With it on, gitcoffer's own
+passphrase prompts re-ask after wrong attempts with a progressive delay
+(1s, then 4s) — for a human at a terminal only; scripts and pipes keep
+the single classic attempt.
+
+Honest scope: guessing a vault's passphrase is an offline attack — an
+attacker with the medium runs their own tools against the sealed slot,
+where no delay we ship can bind them, and any counter on the medium can
+be rewound. This slows only the casual try-it path, and there is no
+lockout and no self-destruct. The real defenses are passphrase entropy
+and the per-guess Argon2id cost, which key add and rekey can raise
+via -kdf within the supported ceilings.`,
+	},
+	{
 		name:    "export-bundle",
 		summary: "export the vault as a plain git bundle",
 		detail: `Prompts for the passphrase, then decrypts the vault into
@@ -221,6 +238,8 @@ func helpUsage(name string) string {
 		return "gitcoffer move <vault-directory> <new-path>"
 	case "migrate":
 		return "gitcoffer migrate [-yes] <vault-directory>"
+	case "backoff":
+		return "gitcoffer backoff <on|off> <vault-directory>"
 	case "key":
 		return "gitcoffer key add [-keyfile <path>] <vault-directory>\n    " +
 			"gitcoffer key remove <vault-directory> <slot-id>\n    " +

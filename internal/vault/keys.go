@@ -118,6 +118,13 @@ func (s *Store) OpenedSlotID() int { return s.openedSlotID }
 // separately from the vault. Returns the new slot id. Meta rewrites hold
 // the writer lock so concurrent key operations refuse rather than race.
 func (s *Store) AddSlot(newPass, keyfile string) (int, error) {
+	return s.AddSlotParams(newPass, keyfile, crypto.DefaultParams())
+}
+
+// AddSlotParams is AddSlot with caller-chosen Argon2id parameters — the
+// per-slot KDF cost selection of the 1.1.0 plan: each derivation is the
+// price of every offline guess against the slot, forever.
+func (s *Store) AddSlotParams(newPass, keyfile string, params crypto.Argon2Params) (int, error) {
 	release, err := s.AcquireLock()
 	if err != nil {
 		return 0, err
@@ -147,14 +154,14 @@ func (s *Store) AddSlot(newPass, keyfile string) (int, error) {
 			return 0, err
 		}
 		secret = newPass + string(data)
-		created, err = crypto.SealSlot(id, secret, s.dek, s.meta.ID, crypto.DefaultParams())
+		created, err = crypto.SealSlot(id, secret, s.dek, s.meta.ID, params)
 		if err == nil {
 			created.Input = crypto.InputPassphraseKeyfile
 			created.Keyfile = keyfile
 			created.KeyfileID = crypto.Hash(data)
 		}
 	} else {
-		created, err = crypto.SealSlot(id, secret, s.dek, s.meta.ID, crypto.DefaultParams())
+		created, err = crypto.SealSlot(id, secret, s.dek, s.meta.ID, params)
 	}
 	if err != nil {
 		return 0, err
@@ -346,6 +353,12 @@ func (s *Store) RemoveSlot(id int) error {
 // vault.meta is rewritten: object data is never re-encrypted (the DEK
 // itself does not change).
 func (s *Store) Rekey(newPass string) error {
+	return s.RekeyParams(newPass, crypto.DefaultParams())
+}
+
+// RekeyParams is Rekey with caller-chosen Argon2id parameters for the
+// re-sealed slot (the per-slot KDF cost selection of the 1.1.0 plan).
+func (s *Store) RekeyParams(newPass string, params crypto.Argon2Params) error {
 	release, err := s.AcquireLock()
 	if err != nil {
 		return err
@@ -381,7 +394,7 @@ func (s *Store) Rekey(newPass string) error {
 			secret = newPass + string(data)
 			keyfileData = data
 		}
-		fresh, err := crypto.SealSlot(sl.ID, secret, s.dek, s.meta.ID, crypto.DefaultParams())
+		fresh, err := crypto.SealSlot(sl.ID, secret, s.dek, s.meta.ID, params)
 		if err != nil {
 			return err
 		}
@@ -401,4 +414,32 @@ func (s *Store) Rekey(newPass string) error {
 		return fmt.Errorf("the key slot this session opened (slot %d) no longer exists — another operation changed the vault's keys; re-open and try again", s.openedSlotID)
 	}
 	return s.rewriteMeta()
+}
+
+// SetBackoff turns the interactive-attempt backoff on or off. Toggling
+// must prove knowledge of the current passphrase — the setting changes
+// how the CLI treats guesses, so it is not free to flip. Like every meta
+// rewrite it takes the writer lock and refreshes under it, so a
+// concurrent key operation is never clobbered.
+func (s *Store) SetBackoff(on bool) error {
+	release, err := s.AcquireLock()
+	if err != nil {
+		return err
+	}
+	defer release()
+	if err := s.refreshMeta(); err != nil {
+		return err
+	}
+	s.meta.Backoff = on
+	return s.rewriteMeta()
+}
+
+// BackoffEnabled reports whether the vault at dir opts into the
+// interactive-attempt backoff (false for vaults without the field).
+func BackoffEnabled(dir string) bool {
+	meta, err := ReadMeta(dir)
+	if err != nil {
+		return false
+	}
+	return meta.Backoff
 }

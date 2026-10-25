@@ -38,7 +38,7 @@ func exportBundleCmd(args []string) error {
 		return fmt.Errorf("refusing to overwrite existing file %s", out)
 	}
 
-	pass, err := promptPassword("Passphrase")
+	_, pass, err := openVaultInteractive(dir)
 	if err != nil {
 		return err
 	}
