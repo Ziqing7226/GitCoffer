@@ -8,4 +8,4 @@ require (
 	golang.org/x/term v0.46.0
 )
 
-toolchain go1.27.1
+toolchain go1.27.3
