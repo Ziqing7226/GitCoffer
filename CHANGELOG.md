@@ -89,6 +89,24 @@
   vault.meta, letting an attacker verify key-file candidates without
   the Argon2id cost — random key files (what Coffer creates) are
   unaffected.
+- CLI: `gitcoffer gc --repack` — reclaims deleted history for real, the
+  1.1.0 plan's repacking item. Plain gc works at file granularity, so an
+  object file written by a push that also carried a since-deleted branch
+  stays referenced as long as any object in it is reachable. The repack
+  decrypts every object file into a scratch repository, has git rebuild
+  one pack from the current refs' closure, stores it and commits a new
+  manifest generation (same refs, exactly one pack), then — still under
+  the writer lock — removes every older generation and the packs only
+  they referenced. Objects under deleted refs physically leave the
+  medium; the recovery generations are dropped with them (space traded
+  for the fallback window, deliberately). Crash-safe throughout
+  (objects before manifest, removals after the commit, lock re-verified
+  before the destructive tail, concurrent pushes detected and refused
+  mid-flight); an interrupted repack leaves a vault that opens, with
+  leftovers the next gc sweeps. The on-disk format is unchanged — v1
+  vaults stay v1, v2 stay v2 — and the guide/threat-model wording about
+  deleted history now points at the command instead of a future
+  feature.
 - Versioning convention: a.b.c with positive integers — a is the major
   direction, b the minor direction (its goals are written down before
   work starts), c the rc counter of the current direction; candidates

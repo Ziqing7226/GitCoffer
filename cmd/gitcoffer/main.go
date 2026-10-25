@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Ziqing7226/GitCoffer/internal/bundle"
 	"github.com/Ziqing7226/GitCoffer/internal/crypto"
 	"github.com/Ziqing7226/GitCoffer/internal/vault"
 	"golang.org/x/term"
@@ -525,8 +526,9 @@ func keyListCmd(args []string) error {
 func gcCmd(args []string) error {
 	fs := flag.NewFlagSet("gc", flag.ContinueOnError)
 	prune := fs.Bool("prune", false, "actually delete what gc finds (without it, gc only reports)")
+	repackFlag := fs.Bool("repack", false, "rebuild the vault's object files from the current refs, so deleted history physically leaves the medium (drops the recovery generations)")
 	fs.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: gitcoffer gc [--prune] <vault-directory>")
+		fmt.Fprintln(os.Stderr, "usage: gitcoffer gc [--prune] [--repack] <vault-directory>")
 		fmt.Fprintln(os.Stderr, usageHint("gc"))
 		fs.PrintDefaults()
 	}
@@ -538,6 +540,26 @@ func gcCmd(args []string) error {
 	pass, err := promptPassword("Passphrase")
 	if err != nil {
 		return err
+	}
+	if *repackFlag {
+		fmt.Fprintln(os.Stderr, "Repacking: decrypting every object file and rebuilding one from the current refs (this can take a while)")
+		res, err := bundle.Repack(dir, pass)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("repacked %d ref(s): %d objects in %s\n", res.Refs, res.Objects, res.NewPack)
+		for _, n := range res.OldGenerations {
+			fmt.Printf("removed manifest generation %d\n", n)
+		}
+		for _, p := range res.OldPacks {
+			fmt.Printf("removed old object file %s\n", p)
+		}
+		fmt.Printf("plaintext held: %s -> %s — unreachable objects no longer exist in the vault\n",
+			humanBytes(res.PlainBytesBefore), humanBytes(res.PlainBytesAfter))
+		fmt.Println("the recovery generations are gone with them; the current refs are untouched")
+		if !*prune {
+			return nil
+		}
 	}
 	if !*prune {
 		rep, err := vault.GCDryRun(dir, pass)

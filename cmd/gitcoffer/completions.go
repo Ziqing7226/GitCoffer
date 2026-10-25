@@ -14,7 +14,7 @@ import (
 const bashCompletion = `# bash completion for gitcoffer
 _gitcoffer() {
 	local commands="init status rekey key gc fsck doctor check move migrate export-bundle version completion help"
-	local gc_opts="--prune" key_opts="--keyfile" ver_opts="--json" global_opts="-h --help"
+	local gc_opts="--prune --repack" key_opts="--keyfile" ver_opts="--json" global_opts="-h --help"
 	if [[ $COMP_CWORD -eq 1 ]]; then
 		COMPREPLY=( $(compgen -W "$commands" -- "$2") )
 		return
@@ -61,7 +61,7 @@ _gitcoffer() {
 			;;
 		args)
 			case $words[2] in
-				gc) _values 'option' --prune ;;
+				gc) _values 'option' --prune --repack ;;
 				key) [[ $CURRENT -eq 3 ]] && _values 'subcommand' add remove list || _files ;;
 				version) _values 'option' --json ;;
 				completion) _values 'shell' bash zsh fish powershell ;;
@@ -98,6 +98,7 @@ complete -c gitcoffer -n '__fish_use_subcommand' -a export-bundle -d 'export the
 complete -c gitcoffer -n '__fish_use_subcommand' -a version -d 'print the build version'
 complete -c gitcoffer -n '__fish_use_subcommand' -a help -d 'print detailed usage'
 complete -c gitcoffer -n '__fish_seen_subcommand_from gc' -l prune -d 'actually delete what gc finds'
+complete -c gitcoffer -n '__fish_seen_subcommand_from gc' -l repack -d 'rebuild packs so deleted history physically leaves the medium'
 complete -c gitcoffer -n '__fish_seen_subcommand_from key; and not __fish_seen_subcommand_from add; and not __fish_seen_subcommand_from remove; and not __fish_seen_subcommand_from list' -a 'add remove list'
 complete -c gitcoffer -n '__fish_seen_subcommand_from version' -l json -d 'print JSON'
 `
@@ -120,7 +121,7 @@ Register-ArgumentCompleter -CommandName gitcoffer -Native -ScriptBlock {
 	$sub = if ($commandAst.CommandElements.Count -ge 2) { $commandAst.CommandElements[1].Value } else { '' }
 	switch ($sub) {
 		'gc' {
-			'--prune' | Where-Object { $_ -like "$wordToComplete*" } |
+			'--prune','--repack' | Where-Object { $_ -like "$wordToComplete*" } |
 				ForEach-Object { [System.Management.Automation.CompletionResult]::new($_) }
 		}
 		'version' {

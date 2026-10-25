@@ -238,7 +238,7 @@ On the drive: one new folder. Nothing else changed.
 | `gitcoffer status <dir>` | inspect a vault (prompts for the passphrase to show refs and packs) |
 | `gitcoffer rekey <dir>` | change the passphrase (data is never re-encrypted) |
 | `gitcoffer key add / remove / list` | manage key slots; optional key-file second factor |
-| `gitcoffer gc [--prune] <dir>` | report reclaimable space, or reclaim it with `--prune` |
+| `gitcoffer gc [--prune] <dir>` | report reclaimable space, or reclaim it with `--prune`; `--repack` also rebuilds the packs so deleted history physically leaves the disk |
 | `gitcoffer fsck <dir>` | verify every structure of the vault |
 | `gitcoffer doctor <dir>` | check the environment and the vault |
 | `gitcoffer check <dir>` | probe a vault from a script — exit 0 opens, 1 vault that does not open, 100 not a vault |

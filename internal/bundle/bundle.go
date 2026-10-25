@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"sort"
 
 	"github.com/Ziqing7226/GitCoffer/internal/packproc"
@@ -39,26 +38,9 @@ func Export(vaultDir, passphrase, outFile string) (int, error) {
 	defer cleanup()
 
 	// Decrypt every stored pack into the scratch repository — the same
-	// revival the fetch path performs.
-	packDir := filepath.Join(repo, "objects", "pack")
-	names := make([]string, 0, len(m.Packs))
-	for name := range m.Packs {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		rd, err := s.ReadObject(name)
-		if err != nil {
-			return 0, err
-		}
-		dst := filepath.Join(packDir, "pack-"+name+".pack")
-		err = writeAllAndClose(rd, dst)
-		if err != nil {
-			return 0, err
-		}
-		if err := packproc.IndexPackInDir(repo, dst); err != nil {
-			return 0, err
-		}
+	// revival the fetch path performs (shared with Repack).
+	if err := revivePacks(s, m, repo); err != nil {
+		return 0, err
 	}
 
 	// Recreate every ref, then a HEAD by the advertised fallback rule so

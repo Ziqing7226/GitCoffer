@@ -309,12 +309,20 @@ FAT32 file-size caps) are listed in
   (orphaned object files), leftover temp files, and old manifest
   generations; `--prune` performs the deletion. It refuses to delete
   anything if any manifest generation fails to decrypt. Running gc
-  without flags reports only; `--prune` deletes. Two honest caveats:
-  the vault is a remote, not an immutable archive — and today gc
-  reclaims only crash debris: objects committed under a ref you later
-  deleted stay on the medium (encrypted, unreferenced) until a future
-  repack feature reclaims them. Treat deleted-but-once-pushed history
-  as still on the disk.
+  without flags reports only; `--prune` deletes. One honest caveat: the
+  vault is a remote, not an immutable archive — and plain gc reclaims
+  only crash debris, because an object file written by a push that also
+  carried a since-deleted branch stays referenced as long as any object
+  in it is reachable.
+- `gitcoffer gc --repack` reclaims deleted history for real: every
+  object file is decrypted, git rebuilds one pack from the current
+  refs' history, and the vault keeps exactly that. Objects under
+  deleted refs physically leave the medium — when that matters (a
+  secret committed by mistake), this is the command. The trade: the
+  recovery manifest generations are dropped along with the old packs,
+  and until you repack, treat deleted-but-once-pushed history as still
+  on the disk, encrypted. An interrupted repack leaves a vault that
+  opens; the next `gc --prune` (or another repack) sweeps the leftovers.
 - Both commands serialize with writers through the vault lock; concurrent
   pushes queue safely rather than corrupting.
 

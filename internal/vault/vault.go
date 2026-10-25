@@ -395,6 +395,12 @@ func manifestGenerations(dir string) []int {
 // newest first.
 func GenerationNums(dir string) []int { return manifestGenerations(dir) }
 
+// VerifyLockHeld re-checks the writer lock for long external operations
+// (repack's destructive tail): when an operation outlives the staleness
+// window and the lock was stolen, removals must abort rather than delete
+// a thief's state.
+func (s *Store) VerifyLockHeld() error { return s.verifyLockHeld() }
+
 // AcquireLock takes the vault writer lock (spec §6, writer lock) so
 // concurrent writers cannot lose each other's updates. Commit refuses to
 // run if the lock was stolen while we held it. The returned release

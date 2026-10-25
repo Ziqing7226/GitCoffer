@@ -122,10 +122,12 @@ One page, plainly:
 - **Not anti-forensics.** No deniability, no hidden volumes.
 - **Not a forgotten-passphrase recovery tool.** There is no recovery, by
   design — a key file is a second factor, never a rescue.
-- **Not an immutable archive — and not a deletion tool.** Deleting a
-  ref does not reclaim the underlying objects today: `gc` reclaims only
-  crash debris, so deleted history stays on the medium, encrypted and
-  unreferenced, until a future repack feature lands.
+- **Not an immutable archive — deletion is real only after a repack.**
+  Deleting a ref does not by itself reclaim the underlying objects:
+  plain `gc` reclaims only crash debris, so deleted history stays on the
+  medium, encrypted and unreachable, until `gc --repack` rebuilds the
+  object files from the current refs — which physically removes it, and
+  drops the recovery generations with it.
 
 ## Cryptographic assumptions
 

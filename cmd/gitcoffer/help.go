@@ -83,13 +83,20 @@ backed-up key file) on any vault that matters.`,
 	},
 	{
 		name:    "gc",
-		summary: "report reclaimable space, or reclaim it with --prune",
+		summary: "report reclaimable space, or reclaim it (--prune, --repack)",
 		detail: `Prompts for the passphrase, then reports space the vault
 could reclaim: object files referenced by no manifest generation, temp
 files left by interrupted writes, and manifest generations beyond the
 vault's kept bound. Without --prune nothing is deleted. With --prune the
 listed items are removed. gc never deletes when any manifest generation
-fails to decrypt — repair the vault with fsck first.`,
+fails to decrypt — repair the vault with fsck first.
+
+--repack reclaims deleted history for real: every object file is
+decrypted and git rebuilds one pack from the current refs, so objects
+under deleted refs physically leave the medium. The recovery
+generations are dropped with the old packs — space is traded for the
+fallback window, deliberately. An interrupted repack leaves a vault
+that opens; run gc --prune (or repack again) to sweep the leftovers.`,
 	},
 	{
 		name:    "fsck",
