@@ -13,7 +13,7 @@ import (
 
 const bashCompletion = `# bash completion for gitcoffer
 _gitcoffer() {
-	local commands="init status rekey key gc fsck doctor export-bundle version completion"
+	local commands="init status rekey key gc fsck doctor export-bundle version completion help"
 	local gc_opts="--prune" key_opts="--keyfile" ver_opts="--json" global_opts="-h --help"
 	if [[ $COMP_CWORD -eq 1 ]]; then
 		COMPREPLY=( $(compgen -W "$commands" -- "$2") )
@@ -46,6 +46,7 @@ _gitcoffer() {
 		'export-bundle:export the vault as a plain git bundle'
 		'version:print the build version'
 		'completion:print a shell completion script'
+		'help:print detailed usage'
 	)
 	_arguments -C \
 		'(-h --help)'{-h,--help}'[show help]' \
@@ -89,6 +90,7 @@ complete -c gitcoffer -n '__fish_use_subcommand' -a fsck -d 'verify every struct
 complete -c gitcoffer -n '__fish_use_subcommand' -a doctor -d 'check the environment and the vault'
 complete -c gitcoffer -n '__fish_use_subcommand' -a export-bundle -d 'export the vault as a plain git bundle'
 complete -c gitcoffer -n '__fish_use_subcommand' -a version -d 'print the build version'
+complete -c gitcoffer -n '__fish_use_subcommand' -a help -d 'print detailed usage'
 complete -c gitcoffer -n '__fish_seen_subcommand_from gc' -l prune -d 'actually delete what gc finds'
 complete -c gitcoffer -n '__fish_seen_subcommand_from key; and not __fish_seen_subcommand_from add; and not __fish_seen_subcommand_from remove; and not __fish_seen_subcommand_from list' -a 'add remove list'
 complete -c gitcoffer -n '__fish_seen_subcommand_from version' -l json -d 'print JSON'
@@ -100,11 +102,11 @@ const powershellCompletion = `# powershell completion for gitcoffer
 # PowerShell 5.1. Add this block to your $PROFILE.
 Register-ArgumentCompleter -CommandName gitcoffer -Native -ScriptBlock {
 	param($wordToComplete, $commandAst, $cursorPosition)
-	$commands = 'init','status','rekey','key','gc','fsck','doctor','export-bundle','version','completion'
+	$commands = 'init','status','rekey','key','gc','fsck','doctor','export-bundle','version','completion','help'
 	# Offer subcommands only while completing the token right after
 	# "gitcoffer"; afterwards, offer the subcommand's flags.
 	if ($commandAst.CommandElements.Count -eq 2 -and
-		$commandAst.CommandElements[1].Value -notmatch '^(init|status|rekey|key|gc|fsck|doctor|export-bundle|version|completion)$') {
+		$commandAst.CommandElements[1].Value -notmatch '^(init|status|rekey|key|gc|fsck|doctor|export-bundle|version|completion|help)$') {
 		$commands | Where-Object { $_ -like "$wordToComplete*" } |
 			ForEach-Object { [System.Management.Automation.CompletionResult]::new($_) }
 		return
@@ -127,6 +129,7 @@ func completionCmd(args []string) error {
 	fs := flag.NewFlagSet("completion", flag.ContinueOnError)
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, "usage: gitcoffer completion <bash|zsh|fish|powershell>")
+		fmt.Fprintln(os.Stderr, usageHint("completion"))
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {

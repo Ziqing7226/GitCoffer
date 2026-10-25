@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- CLI: `gitcoffer help` (also `-h`/`--help`, and `gitcoffer help
+  <command>`) now prints a self-describing guide — what the tool is, the
+  `coffer::` URL form, every command with its arguments and behavior,
+  how passphrase prompts behave under a non-terminal stdin, and the
+  exit codes — so a person or a program can operate the CLI without
+  opening the documentation. Usage errors exit 2 and per-command usage
+  lines point at the matching help section; `-h` on a subcommand exits
+  0 instead of reporting a flag error.
+
 - Versioning convention: a.b.c with positive integers — a is the major
   direction, b the minor direction (its goals are written down before
   work starts), c the rc counter of the current direction; candidates

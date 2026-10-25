@@ -16,6 +16,7 @@ func exportBundleCmd(args []string) error {
 	fs := flag.NewFlagSet("export-bundle", flag.ContinueOnError)
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, "usage: gitcoffer export-bundle <vault-directory> <output.bundle>")
+		fmt.Fprintln(os.Stderr, usageHint("export-bundle"))
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {

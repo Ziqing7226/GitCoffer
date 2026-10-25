@@ -239,6 +239,7 @@ On the drive: one new folder. Nothing else changed.
 | `gitcoffer export-bundle <dir> <file>` | export the vault as a plain git bundle — the exit path |
 | `gitcoffer version [--json]` | print the build version (optionally as JSON) |
 | `gitcoffer completion <shell>` | print a completion script for bash, zsh, fish, or powershell |
+| `gitcoffer help [<command>]` | print detailed usage for one command, or for all of them |
 
 Please run `gitcoffer fsck` on your vault from time to time — after a
 big push, or once a month. It checks every part of the vault, so a

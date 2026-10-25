@@ -15,7 +15,7 @@ import (
 // implementedCommands is the source of truth: every gitcoffer subcommand.
 var implementedCommands = []string{
 	"init", "status", "rekey", "key", "gc", "fsck", "doctor",
-	"export-bundle", "version", "completion",
+	"export-bundle", "version", "completion", "help",
 }
 
 func TestUsageListsEveryCommand(t *testing.T) {

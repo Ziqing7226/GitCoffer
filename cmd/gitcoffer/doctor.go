@@ -40,6 +40,7 @@ func doctorCmd(args []string) error {
 	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
 	fs.Usage = func() {
 		fmt.Fprintln(os.Stderr, "usage: gitcoffer doctor <vault-directory>")
+		fmt.Fprintln(os.Stderr, usageHint("doctor"))
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(args); err != nil {
