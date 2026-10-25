@@ -256,6 +256,14 @@ decision, not an omission:
 
 ## The 1.1.0 work plan (named by the maintainer, 2026-10-12)
 
+Status (2026-10-27): every item below is implemented on the `develop`
+branch — check, upstream auto-attach, move, format v2 with the explicit
+migrate, migratable key-file paths (content recognition), gc repacking
+(`--repack`), and the brute-force options (`-kdf`, interactive backoff).
+The compatibility rule below holds throughout: v1 vaults stay v1 unless
+explicitly migrated, and nothing changes without the user acting. The
+branch awaits the release gate (rc, dual-OS device testing) before 1.1.0.
+
 **Compatibility rule: upgrading to 1.1.0 must not change existing
 vaults.** The check command is read-only; move relocates a vault
 without touching its contents; key-file and repack changes
