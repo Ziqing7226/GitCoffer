@@ -146,8 +146,9 @@ non-interactive run, keeps it as the natural backup.
 After the move, every clone needs one line (printed for you):
 git remote set-url origin "coffer::<new-path>". Key-file slots whose
 recorded path the move invalidates are flagged, and a target on an
-online or synced filesystem (network share, cloud folder) gets a word
-of caution.`,
+online or synced filesystem gets a word of caution — detected by
+filesystem type, so some cloud-sync folders that report as ordinary
+disks are not caught.`,
 	},
 	{
 		name:    "migrate",

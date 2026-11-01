@@ -98,6 +98,11 @@ func moveCmd(args []string) error {
 	// Same-filesystem: one atomic rename, no passphrase needed. A
 	// cross-filesystem rename fails with the platform's not-same-device
 	// error and falls through to the copy path.
+	if vault.LockHeld(src) {
+		// Narrow the check-then-act window from the earlier probe: a
+		// writer that started in between gets renamed under otherwise.
+		return fmt.Errorf("the vault just became busy (another coffer operation holds the lock) — wait for it to finish, then move again")
+	}
 	if err := os.Rename(src, dst); err == nil {
 		moveReport(meta, src, dst, keyfileNotes, false)
 		return nil
@@ -124,6 +129,13 @@ func moveCmd(args []string) error {
 		answer, _ := readStdinLine()
 		switch strings.ToLower(strings.TrimSpace(answer)) {
 		case "y", "yes":
+			// Re-guard: a push that landed while the question sat on
+			// screen exists only in the source — removing it would
+			// destroy commits the copy predates.
+			if vault.LockHeld(src) {
+				fmt.Printf("Source kept at %s — it became busy while you were deciding, so it may now hold newer commits than the copy; re-run the move (or compare) before removing it by hand.\n", src)
+				return nil
+			}
 			if err := os.RemoveAll(src); err != nil {
 				return fmt.Errorf("removing the source failed (%v) — remove %s by hand when ready", err, src)
 			}
@@ -155,6 +167,13 @@ func copyVaultVerified(src, dst, pass string) error {
 		os.RemoveAll(dst)
 		return fmt.Errorf("copying the vault failed: %v", err)
 	}
+	// Durability before the "copied and verified" claim (and before the
+	// source-removal offer): flush the copied files' directories so a
+	// crash cannot leave a target that verifies through the page cache
+	// but is incomplete on the medium. Best-effort — the read-back
+	// verification below is the load-bearing check.
+	syncDirBestEffort(dst)
+	syncDirBestEffort(filepath.Join(dst, "obj"))
 	if _, err := vault.Open(dst, pass); err != nil {
 		os.RemoveAll(dst)
 		return fmt.Errorf("the copied vault does not open: %v", err)
@@ -217,9 +236,17 @@ func keyfileSlotNotes(meta vault.Meta, src string) []string {
 			continue
 		}
 		if insideSource(src, filepath.Clean(registered)) {
-			notes = append(notes, fmt.Sprintf(
-				"  [warn] slot %d's key file lives inside the vault and is recorded at its old path (%s) — the file moved along and content recognition finds it at the new location; re-register it with gitcoffer key add to record the new path",
-				sl.ID, sanitizePath(registered)))
+			if sl.KeyfileID != "" {
+				notes = append(notes, fmt.Sprintf(
+					"  [warn] slot %d's key file lives inside the vault and is recorded at its old path (%s) — the file moved along and content recognition finds it at the new location; re-register it with gitcoffer key add to record the new path",
+					sl.ID, sanitizePath(registered)))
+			} else {
+				// A pre-1.1.0 slot records no content hash, so
+				// recognition cannot run for it.
+				notes = append(notes, fmt.Sprintf(
+					"  [warn] slot %d's key file lives inside the vault and is recorded at its old path (%s) — the file moved along, but this slot predates content recognition, so it cannot open until a key file sits at the recorded path or the slot is replaced with gitcoffer key add",
+					sl.ID, sanitizePath(registered)))
+			}
 		}
 	}
 	return notes
@@ -247,6 +274,13 @@ func copyVaultTree(src, dst string) error {
 			}
 			return os.MkdirAll(dst, info.Mode().Perm())
 		}
+		if rel == "vault.lock" {
+			// This operation's own writer lock (copyVaultVerified holds
+			// it): never travels — at the target it would name this dead
+			// process and block the next writer until the staleness
+			// window passes, or worse, look live to a same-host reader.
+			return nil
+		}
 		info, ierr := d.Info()
 		if ierr != nil {
 			return ierr
@@ -266,20 +300,44 @@ func copyVaultTree(src, dst string) error {
 }
 
 func copyFile(src, dst string, perm fs.FileMode) error {
-	in, err := os.Open(src)
+	in, err := openFileNoFollow(src)
 	if err != nil {
 		return err
 	}
 	defer in.Close()
+	// Post-open re-check: the walk classified the entry, but the medium
+	// can swap it between that check and this open — refuse anything
+	// that is not a regular file at open time.
+	if sinfo, serr := in.Stat(); serr != nil {
+		return serr
+	} else if !sinfo.Mode().IsRegular() {
+		return fmt.Errorf("refusing to copy %s: it is not a regular file at open time", sanitizePath(src))
+	}
 	out, err := os.OpenFile(dst, os.O_CREATE|os.O_EXCL|os.O_WRONLY, perm)
 	if err != nil {
 		return err
 	}
 	_, err = io.Copy(out, in)
+	if err == nil {
+		// Durability: the copy is claimed verified, and the source may be
+		// removed right after — the bytes must be on the medium first.
+		err = out.Sync()
+	}
 	if cerr := out.Close(); err == nil {
 		err = cerr
 	}
 	return err
+}
+
+// syncDirBestEffort flushes a directory entry list; failures are ignored
+// (some platforms and filesystems refuse directory fsync).
+func syncDirBestEffort(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	f.Sync()
+	f.Close()
 }
 
 // insideSource reports whether dst lies inside src (or equals it).
@@ -304,10 +362,14 @@ func syncyFilesystem(name string) bool {
 		"nfs", "nfs2", "nfs3", "nfs4", "nfsd",
 		"afp", "afpfs",
 		"prjfs", // Windows projected FS: OneDrive-style cloud folders
-		"davfs2", "webdav":
+		"davfs2", "webdav",
+		"sshfs", "9p", "ceph", "cephfs", "glusterfs":
 		return true
 	}
-	return strings.Contains(strings.ToLower(name), "rclone")
+	lower := strings.ToLower(name)
+	return strings.Contains(lower, "rclone") ||
+		strings.HasPrefix(lower, "fuse.") || // fuse.sshfs, fuse.rclone, …
+		lower == "macfuse" || lower == "osxfuse"
 }
 
 // readStdinLine reads one line from stdin for interactive questions.

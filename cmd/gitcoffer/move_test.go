@@ -135,6 +135,7 @@ func TestCopyVaultTree(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.WriteFile(filepath.Join(src, "vault.meta"), []byte("meta"), 0o600)
+	os.WriteFile(filepath.Join(src, "vault.lock"), []byte("host=x\npid=1\nstarted=2026-01-01T00:00:00Z\n"), 0o600)
 	os.WriteFile(filepath.Join(src, "obj", "abc"), []byte("payload-abc"), 0o600)
 	dst := filepath.Join(base, "copy")
 	if err := copyVaultTree(src, dst); err != nil {
@@ -148,6 +149,12 @@ func TestCopyVaultTree(t *testing.T) {
 		if err != nil || string(data) != want {
 			t.Errorf("copied %s = %q, %v; want %q", rel, data, err, want)
 		}
+	}
+	// The writer lock never travels: at the target it would name this
+	// (finished) process and block the next writer for a staleness
+	// window, or read as live to same-host readers.
+	if _, err := os.Stat(filepath.Join(dst, "vault.lock")); !os.IsNotExist(err) {
+		t.Fatalf("vault.lock was copied (%v) — it must be excluded", err)
 	}
 
 	// A planted symlink must abort the copy rather than read through it.
@@ -215,8 +222,10 @@ func TestKeyfileSlotNotes(t *testing.T) {
 func TestSyncyFilesystem(t *testing.T) {
 	for name, want := range map[string]bool{
 		"cifs": true, "smbfs": true, "nfs4": true, "prjfs": true,
-		"fuse.rclone": true, "davfs2": true,
+		"fuse.rclone": true, "davfs2": true, "sshfs": true,
+		"9p": true, "fuse.sshfs": true, "macfuse": true, "cephfs": true,
 		"ext4": false, "ntfs": false, "exfat": false, "vfat": false, "apfs": false,
+		"fusectl": false,
 	} {
 		if got := syncyFilesystem(name); got != want {
 			t.Errorf("syncyFilesystem(%q) = %v, want %v", name, got, want)

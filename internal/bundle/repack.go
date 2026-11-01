@@ -84,10 +84,15 @@ func Repack(vaultDir, passphrase string) (*RepackResult, error) {
 
 	// One pack holding the refs' full closure. Objects of deleted refs
 	// are unreachable here — this is where the reclamation happens.
-	packPath, err := packFromRefs(repo, m)
+	packPath, cleanupPack, err := packFromRefs(repo, m)
 	if err != nil {
 		return nil, err
 	}
+	// The rebuilt pack is the full DECRYPTED history in plaintext temp
+	// space: it must not outlive this command (on Windows it would sit
+	// in %TEMP% on the system drive). Removed once the bytes are stored
+	// in the vault.
+	defer cleanupPack()
 	oids, idxCleanup, err := packproc.IndexPack(packPath)
 	if err != nil {
 		return nil, err
@@ -208,16 +213,18 @@ func revivePacks(s *vault.Store, m *vault.Manifest, repo string) error {
 }
 
 // packFromRefs builds one pack holding everything reachable from the
-// manifest's refs, inside the scratch repository.
-func packFromRefs(repo string, m *vault.Manifest) (string, error) {
+// manifest's refs, inside the scratch repository. The caller must run
+// the returned cleanup — the pack is plaintext history in temp space.
+func packFromRefs(repo string, m *vault.Manifest) (string, func(), error) {
 	revs := make([]string, 0, len(m.Refs))
 	for _, rv := range m.Refs {
 		revs = append(revs, rv.OID)
 	}
 	tmp, err := os.MkdirTemp("", "coffer-repack-")
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
+	cleanup := func() { os.RemoveAll(tmp) }
 	packPath := filepath.Join(tmp, "repack.pack")
 	cmd := exec.Command("git", "pack-objects", "--stdout", "--revs")
 	cmd.Dir = repo
@@ -225,25 +232,30 @@ func packFromRefs(repo string, m *vault.Manifest) (string, error) {
 	cmd.Stdin = newLineReader(revs)
 	out, err := os.Create(packPath)
 	if err != nil {
-		return "", err
+		cleanup()
+		return "", nil, err
 	}
 	cmd.Stdout = out
 	runErr := cmd.Run()
 	cerr := out.Close()
 	if runErr != nil {
-		return "", fmt.Errorf("pack-objects: %v", runErr)
+		cleanup()
+		return "", nil, fmt.Errorf("pack-objects: %v", runErr)
 	}
 	if cerr != nil {
-		return "", cerr
+		cleanup()
+		return "", nil, cerr
 	}
 	info, err := os.Stat(packPath)
 	if err != nil {
-		return "", err
+		cleanup()
+		return "", nil, err
 	}
 	if info.Size() == 0 {
-		return "", fmt.Errorf("pack-objects produced no pack — the refs point at objects missing from the stored packs; run gitcoffer fsck")
+		cleanup()
+		return "", nil, fmt.Errorf("pack-objects produced no pack — the refs point at objects missing from the stored packs; run gitcoffer fsck")
 	}
-	return packPath, nil
+	return packPath, cleanup, nil
 }
 
 func newLineReader(lines []string) *strings.Reader {

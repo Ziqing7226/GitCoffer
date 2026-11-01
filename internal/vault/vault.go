@@ -56,6 +56,15 @@ type Meta struct {
 	// them (the 1.1.0 plan's honest scoping). Optional field, the same
 	// version-free class as the slot extras; older readers ignore it.
 	Backoff bool `json:"backoff,omitempty"`
+	// ManifestSeal states which manifest AAD the vault accepts (spec §9):
+	// absent/0 means the v1 seal also authenticates — the window a
+	// v1→v2 migration opens while it reseals generations — and a value
+	// of 2 closes that window: only v2-sealed manifests authenticate.
+	// Vaults born on v2 carry 2 from creation. The field lives in
+	// plaintext meta and is not itself authenticated; a medium-writer
+	// who edits it retains the plain truncation rollback anyway, which
+	// is the documented residual.
+	ManifestSeal int `json:"manifest_seal,omitempty"`
 }
 
 // RefVal is one advertised ref (spec §4).
@@ -258,6 +267,11 @@ func CreateFormat(dir, passphrase string, params crypto.Argon2Params, formatVers
 		Created:       time.Now().UTC(),
 		Slots:         []crypto.Slot{*slot},
 	}
+	if formatVersion == crypto.FormatVersionV2 {
+		// Born on v2: no v1-sealed manifest will ever exist here, so the
+		// migration window starts closed.
+		meta.ManifestSeal = crypto.FormatVersionV2
+	}
 	metaData, err := json.MarshalIndent(meta, "", "  ")
 	if err != nil {
 		return nil, err
@@ -354,11 +368,14 @@ func (s *Store) readManifestNum(n int) (*Manifest, string, error) {
 	}
 	var payload []byte
 	if s.meta.FormatVersion == crypto.FormatVersionV2 {
-		// v2 manifests bind their generation into the AAD. A v2 vault may
-		// still hold v1-sealed generations until `gitcoffer migrate`
-		// finishes resealing them (meta flips to v2 first, so this window
-		// is readable) — fall back to the v1 seal for those.
-		if payload, err = crypto.OpenManifestV2(s.dek, s.meta.ID, n, data); err != nil {
+		// v2 manifests bind their generation into the AAD. While the
+		// migration window is open (ManifestSeal unset), a v2 vault may
+		// hold v1-sealed generations until `gitcoffer migrate` finishes
+		// resealing them — fall back to the v1 seal for those. Once the
+		// window is closed, a v1 seal is damage like any other
+		// authentication failure: pre-migration manifest copies re-filed
+		// under a new generation must not come back to life.
+		if payload, err = crypto.OpenManifestV2(s.dek, s.meta.ID, n, data); err != nil && s.meta.ManifestSeal < crypto.FormatVersionV2 {
 			payload, err = crypto.OpenManifest(s.dek, s.meta.ID, data)
 		}
 	} else {

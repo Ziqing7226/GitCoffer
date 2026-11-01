@@ -262,7 +262,7 @@ func initCmd(args []string) error {
 		return err
 	}
 	fmt.Printf("Vault created: %s\n  id: %s\n  format: v%d\n  key slots: %d\n",
-		dir, s.Meta().ID, crypto.FormatVersion, len(s.Meta().Slots))
+		dir, s.Meta().ID, s.Meta().FormatVersion, len(s.Meta().Slots))
 	return nil
 }
 
@@ -332,8 +332,11 @@ var stdinLines *bufio.Reader
 // it is hidden; when stdin is not a terminal (scripts, tests) one line is
 // read instead — the same channel typing would use, so nothing is weaker.
 func promptPassword(label string) (string, error) {
-	fmt.Fprintln(os.Stderr, label+":")
+	// The label is for a human at a terminal. Non-terminal stdin —
+	// scripts, schedulers reading a passphrase file — stays silent: a
+	// printed prompt would mail noise from every scheduled run.
 	if term.IsTerminal(int(os.Stdin.Fd())) {
+		fmt.Fprintln(os.Stderr, label+":")
 		b, err := term.ReadPassword(int(os.Stdin.Fd()))
 		fmt.Fprintln(os.Stderr)
 		if err != nil {
@@ -409,7 +412,10 @@ func openWithRetries(dir string, retry bool, delay func(attempt int)) (*vault.St
 		var err error
 		pass, err = promptPassword("Passphrase")
 		if err != nil {
-			return nil, "", err
+			// Name the failed read: a scheduled run with a missing or
+			// unreadable passphrase file must not look like a vault
+			// problem (exit 1 either way, but the message differs).
+			return nil, "", fmt.Errorf("could not read a passphrase (%v) — a scheduled run feeds it from a file on stdin; see the user guide's schedule recipe", err)
 		}
 		s, err := vault.Open(dir, pass)
 		if err == nil {

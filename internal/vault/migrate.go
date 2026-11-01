@@ -20,7 +20,16 @@ package vault
 //  3. every generation is resealed with its generation number in the
 //     AAD, same payload bytes (the prev chain hashes the plaintext, so
 //     resealing keeps the chain intact), write-temp-and-rename per file;
-//  4. the vault is reopened and fscked again before success is reported.
+//  4. the vault is reopened and fscked again, and only then does meta
+//     record ManifestSeal = 2, closing the v1-seal window: from here on
+//     a v1-sealed manifest is damage, so pre-migration manifest copies
+//     (an attacker's earlier drive image) re-filed under a new
+//     generation no longer authenticate. The marker is plaintext meta —
+//     a medium-writer could unset it, but that adversary retains the
+//     plain truncation rollback anyway (docs/threat-model.md).
+//
+// An interrupted run leaves the window open and is finished by running
+// the command again (steps 3-4 are idempotent).
 
 import (
 	"errors"
@@ -31,19 +40,18 @@ import (
 	"github.com/Ziqing7226/GitCoffer/internal/crypto"
 )
 
-// ErrAlreadyV2 reports a vault that is already on format v2.
+// ErrAlreadyV2 reports a vault that is fully on format v2: the seal
+// window is closed, there is nothing to migrate or resume.
 var ErrAlreadyV2 = errors.New("vault is already on format v2")
 
-// Migrate converts the v1 vault at dir to format v2 in place. The caller
-// is expected to have warned about the one-way door (binaries older than
-// 1.1.0 refuse a v2 vault); the migration itself refuses damaged input.
+// Migrate converts the v1 vault at dir to format v2 in place, or
+// finishes a previously interrupted migration. The caller is expected to
+// have warned about the one-way door (binaries older than 1.1.0 refuse a
+// v2 vault); the migration itself refuses damaged input.
 func Migrate(dir, passphrase string) error {
 	s, err := Open(dir, passphrase)
 	if err != nil {
 		return err
-	}
-	if s.meta.FormatVersion == crypto.FormatVersionV2 {
-		return ErrAlreadyV2
 	}
 	release, err := s.AcquireLock()
 	if err != nil {
@@ -51,27 +59,47 @@ func Migrate(dir, passphrase string) error {
 	}
 	defer release()
 
-	// Damaged input is repaired, not migrated: a fallback-served vault
-	// would bake the damage into the resealed generations.
-	findings, err := Fsck(dir, passphrase)
-	if err != nil {
+	// Adopt whatever other writers committed since this Open: meta
+	// rewrites always refresh under the lock, or a concurrent key
+	// operation reported as successful would be silently undone.
+	if err := s.refreshMeta(); err != nil {
 		return err
 	}
-	for _, f := range findings {
-		if f.Err {
-			return fmt.Errorf("fsck reported errors — repair the vault (gitcoffer fsck lists each finding) before migrating")
+
+	if s.meta.FormatVersion == crypto.FormatVersionV2 {
+		if s.meta.ManifestSeal >= crypto.FormatVersionV2 {
+			return ErrAlreadyV2
 		}
+		// An interrupted migration: the window is open, so verify the
+		// state and resume (the reseal is idempotent).
+		if err := fsckClean(dir, passphrase); err != nil {
+			return err
+		}
+		return s.completeMigration(passphrase)
+	}
+
+	// Damaged input is repaired, not migrated: a fallback-served vault
+	// would bake the damage into the resealed generations.
+	if err := fsckClean(dir, passphrase); err != nil {
+		return err
 	}
 
 	// Flip meta first: the v1-fallback read keeps this build working on
 	// not-yet-resealed generations, and older binaries stop here instead
-	// of half-trusting the result.
+	// of half-trusting the result. ManifestSeal stays unset — the window
+	// opens with the flip and closes only at the end of step 4.
 	s.meta.FormatVersion = crypto.FormatVersionV2
 	if err := s.rewriteMeta(); err != nil {
 		return err
 	}
+	return s.completeMigration(passphrase)
+}
 
-	for _, n := range manifestGenerations(dir) {
+// completeMigration reseals every generation (skipping the already-v2,
+// so re-runs converge), verifies the result end to end, and closes the
+// v1-seal window. The lock is held throughout.
+func (s *Store) completeMigration(passphrase string) error {
+	for _, n := range manifestGenerations(s.dir) {
 		if err := s.resealGeneration(n); err != nil {
 			return fmt.Errorf("resealing manifest generation %d failed (%v) — run gitcoffer migrate again to finish", n, err)
 		}
@@ -79,20 +107,37 @@ func Migrate(dir, passphrase string) error {
 
 	// Verify before reporting success: the migrated vault must open on
 	// its newest generation and pass fsck clean.
-	s2, err := Open(dir, passphrase)
+	s2, err := Open(s.dir, passphrase)
 	if err != nil {
 		return fmt.Errorf("the migrated vault does not open: %w", err)
 	}
 	if f := s2.FallbackFromGeneration(); f > 0 {
 		return fmt.Errorf("the migrated vault serves a fallback generation (%d) — run gitcoffer migrate again to finish", f)
 	}
-	findings, err = Fsck(dir, passphrase)
+	findings, err := Fsck(s.dir, passphrase)
 	if err != nil {
 		return err
 	}
 	for _, f := range findings {
 		if f.Err {
 			return fmt.Errorf("fsck on the migrated vault reported errors — run gitcoffer fsck and migrate again")
+		}
+	}
+
+	s.meta.ManifestSeal = crypto.FormatVersionV2
+	return s.rewriteMeta()
+}
+
+// fsckClean reports whether the vault passes fsck with no error
+// findings; it is the migration precondition.
+func fsckClean(dir, passphrase string) error {
+	findings, err := Fsck(dir, passphrase)
+	if err != nil {
+		return err
+	}
+	for _, f := range findings {
+		if f.Err {
+			return fmt.Errorf("fsck reported errors — repair the vault (gitcoffer fsck lists each finding) before migrating")
 		}
 	}
 	return nil

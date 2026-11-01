@@ -339,35 +339,59 @@ func TestCommitQuarantinesDamagedOccupant(t *testing.T) {
 
 // TestCommitRefusesNewerManifestVersion: a slot occupied by a manifest
 // from a newer GitCoffer must not be quarantined away — the push
-// refuses and points at upgrading.
+// refuses and points at upgrading. Pinned for both seals: a v1 vault
+// occupied by a v1-sealed version-2 manifest, and a v2 vault occupied
+// by a v2-sealed one. (In a window-closed v2 vault a v1-SEALED occupant
+// is plain damage — quarantine is correct there.)
 func TestCommitRefusesNewerManifestVersion(t *testing.T) {
-	dir := t.TempDir()
-	s, _ := storeWithObject(t, dir, "pass")
-	gen := s.manifestNum
-	path := filepath.Join(dir, fmt.Sprintf("%s%d", manifestPrefix, gen))
-	// Simulate the newer-version refusal: seal a v2-declaring payload
-	// with the real DEK — the slot is occupied by a manifest this build
-	// cannot read for a NON-damage reason.
-	payload := []byte(`{"version":2,"refs":{}}`)
-	record, err := crypto.SealManifest(s.dek, s.meta.ID, payload)
-	if err != nil {
-		t.Fatal(err)
+	build := func(t *testing.T, format int) (*Store, string, []byte) {
+		dir := t.TempDir()
+		var s *Store
+		var err error
+		if format == crypto.FormatVersion {
+			s, err = CreateFormat(dir, "pass", weakParams(), format)
+		} else {
+			s, err = CreateFormat(dir, "pass", weakParams(), format)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		gen := s.manifestNum
+		path := filepath.Join(dir, fmt.Sprintf("%s%d", manifestPrefix, gen))
+		// Simulate the newer-version refusal: seal a v2-declaring payload
+		// with the real DEK under the seal this vault accepts — the slot
+		// is occupied by a manifest this build cannot read for a
+		// NON-damage reason.
+		payload := []byte(`{"version":2,"refs":{}}`)
+		var record []byte
+		if format == crypto.FormatVersion {
+			record, err = crypto.SealManifest(s.dek, s.meta.ID, payload)
+		} else {
+			record, err = crypto.SealManifestV2(s.dek, s.meta.ID, gen, payload)
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, record, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		s.manifestNum = gen - 1
+		return s, path, []byte{}
 	}
-	if err := os.WriteFile(path, record, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	s.manifestNum = gen - 1
-	m := s.Manifest()
-	m.Refs["refs/heads/main"] = RefVal{OID: strings.Repeat("e", 40)}
-	err = s.Commit(m)
-	if err == nil || !strings.Contains(err.Error(), "newer GitCoffer") {
-		t.Fatalf("newer-version occupant not refused: %v", err)
-	}
-	if _, err := os.Stat(path + ".corrupt"); err == nil {
-		t.Fatal("newer-version manifest was quarantined as damaged")
-	}
-	if _, err := os.Stat(path); err != nil {
-		t.Fatal("newer-version manifest removed")
+	for _, format := range []int{crypto.FormatVersion, crypto.FormatVersionV2} {
+		s, path, _ := build(t, format)
+		m := s.Manifest()
+		m.Refs["refs/heads/main"] = RefVal{OID: strings.Repeat("e", 40)}
+		err := s.Commit(m)
+		if err == nil || !strings.Contains(err.Error(), "newer GitCoffer") {
+			t.Fatalf("format v%d: newer-version occupant not refused: %v", format, err)
+		}
+		if _, err := os.Stat(path + ".corrupt"); err == nil {
+			t.Fatalf("format v%d: newer-version manifest was quarantined as damaged", format)
+		}
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("format v%d: newer-version manifest removed", format)
+		}
 	}
 }
 

@@ -56,7 +56,13 @@ and, as importantly, what it does not.
   manifest's bytes under a newer generation's name is *rejected* — the
   generation number is part of the manifest's authentication — so the
   rollback that survives is plain truncation, which the `prev` chain
-  still surfaces as a diagnostic.
+  still surfaces as a diagnostic. For migrated vaults this holds once
+  the migration completes: a plaintext marker in `vault.meta`
+  (`manifest_seal`) then closes the reader's acceptance of v1-sealed
+  manifests, so pre-migration manifest copies re-filed under a new
+  generation fail authentication too. The marker is not itself
+  authenticated — editing it reopens that one window, but a
+  medium-writer retains truncation either way.
 
 ## Metadata leakage (known, accepted)
 

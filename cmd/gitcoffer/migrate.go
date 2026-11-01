@@ -37,17 +37,25 @@ func migrateCmd(args []string) error {
 	if err != nil {
 		return err
 	}
-	if meta.FormatVersion >= crypto.FormatVersionV2 {
+	done := meta.FormatVersion >= crypto.FormatVersionV2 && meta.ManifestSeal >= crypto.FormatVersionV2
+	resume := meta.FormatVersion >= crypto.FormatVersionV2 && !done
+	if done {
 		fmt.Printf("Vault is already on format v%d — nothing to do.\n", meta.FormatVersion)
 		return nil
 	}
-
-	// The one-way door, stated before anything is touched.
-	fmt.Printf("This vault (id %s) is on format v1. Migrating converts it to v2, in place:\n", meta.ID)
-	fmt.Println("  - v2 rejects rolled-back manifests at authentication time (v1 only warns after the fact);")
-	fmt.Println("  - object data is not re-encrypted, and clones keep working with the same URL;")
-	fmt.Println("  - binaries older than 1.1.0 REFUSE a v2 vault. On a drive you hand to another")
-	fmt.Println("    machine, migrate only when that machine runs GitCoffer 1.1.0 or newer.")
+	if resume {
+		fmt.Println("This vault has an interrupted migration (format v2, v1-sealed generations remain).")
+		fmt.Println("Re-running finishes it: every remaining generation is resealed and the migration")
+		fmt.Println("window is closed. The one-way door still applies: binaries older than 1.1.0 refuse")
+		fmt.Println("this vault.")
+	} else {
+		// The one-way door, stated before anything is touched.
+		fmt.Printf("This vault (id %s) is on format v1. Migrating converts it to v2, in place:\n", meta.ID)
+		fmt.Println("  - v2 rejects rolled-back manifests at authentication time (v1 only warns after the fact);")
+		fmt.Println("  - object data is not re-encrypted, and clones keep working with the same URL;")
+		fmt.Println("  - binaries older than 1.1.0 REFUSE a v2 vault. On a drive you hand to another")
+		fmt.Println("    machine, migrate only when that machine runs GitCoffer 1.1.0 or newer.")
+	}
 	confirmed := *yes
 	if !confirmed {
 		if !term.IsTerminal(int(os.Stdin.Fd())) {

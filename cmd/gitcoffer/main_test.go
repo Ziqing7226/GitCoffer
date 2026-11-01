@@ -159,23 +159,35 @@ func captureCompletion(t *testing.T, shell string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Same discipline as captureStdout: drain while f runs (script text
+	// can exceed small pipe buffers), and restore via defer so a t.Fatal
+	// inside f cannot break the package's stdout for later tests.
 	os.Stdout = w
-	if err := completionCmd([]string{shell}); err != nil {
+	done := make(chan string, 1)
+	go func() {
+		buf := make([]byte, 8192)
+		var sb strings.Builder
+		for {
+			n, err := r.Read(buf)
+			sb.Write(buf[:n])
+			if err != nil {
+				done <- sb.String()
+				return
+			}
+		}
+	}()
+	defer func() {
 		os.Stdout = old
+	}()
+	err = completionCmd([]string{shell})
+	w.Close() // EOF for the drain goroutine (the deferred close is a harmless second close on the t.Fatal path)
+	out := <-done
+	r.Close()
+	os.Stdout = old
+	if err != nil {
 		t.Fatalf("completion %s: %v", shell, err)
 	}
-	w.Close()
-	os.Stdout = old
-	var sb strings.Builder
-	buf := make([]byte, 8192)
-	for {
-		n, err := r.Read(buf)
-		sb.Write(buf[:n])
-		if err != nil {
-			break
-		}
-	}
-	return sb.String()
+	return out
 }
 
 func captureCompletionErr(t *testing.T, shell string) (string, error) {

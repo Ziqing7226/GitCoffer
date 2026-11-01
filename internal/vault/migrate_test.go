@@ -178,6 +178,105 @@ func TestRollbackRefilingV1SilentV2Rejected(t *testing.T) {
 	}
 }
 
+// TestMigrateResumeAfterInterruptedFlip pins the resume promise: a run
+// interrupted after the meta flip (some generations still v1-sealed)
+// must be finished by running migrate again — not answered with
+// "already on v2".
+func TestMigrateResumeAfterInterruptedFlip(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "v.coffer")
+	s, err := CreateFormat(dir, "pass123", crypto.DefaultParams(), crypto.FormatVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitGeneration(t, s, 'a')
+	commitGeneration(t, s, 'b')
+
+	// Simulate the crash window: meta flipped to v2, reseal never ran.
+	opener, err := Open(dir, "pass123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	opener.meta.FormatVersion = crypto.FormatVersionV2
+	if err := opener.rewriteMeta(); err != nil {
+		t.Fatal(err)
+	}
+
+	// The resume must complete the migration.
+	if err := Migrate(dir, "pass123"); err != nil {
+		t.Fatalf("resume migrate: %v", err)
+	}
+	meta, err := ReadMeta(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta.ManifestSeal < crypto.FormatVersionV2 {
+		t.Fatal("resume did not close the migration window (manifest_seal unset)")
+	}
+	s2, err := Open(dir, "pass123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range GenerationNums(dir) {
+		raw, err := os.ReadFile(filepath.Join(dir, manifestName(n)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := crypto.OpenManifestV2(s2.dek, meta.ID, n, raw); err != nil {
+			t.Errorf("generation %d still not v2-sealed after resume: %v", n, err)
+		}
+	}
+	// And a further re-run reports done.
+	if err := Migrate(dir, "pass123"); err != ErrAlreadyV2 {
+		t.Fatalf("migrate after resume = %v, want ErrAlreadyV2", err)
+	}
+}
+
+// TestMigratedVaultRejectsPreMigrationV1Copy is the attack the v2 seal
+// window exists to close: an attacker holding v1-sealed manifest bytes
+// from before the migration (an earlier drive image) re-files them
+// under a new generation of the migrated vault. The migration window
+// must be closed, so the refiled record must not authenticate.
+func TestMigratedVaultRejectsPreMigrationV1Copy(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "v.coffer")
+	s, err := CreateFormat(dir, "pass123", crypto.DefaultParams(), crypto.FormatVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitGeneration(t, s, 'a')
+	// The attacker images the medium: a v1-sealed manifest of the old state.
+	oldBytes, err := os.ReadFile(filepath.Join(dir, manifestName(1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitGeneration(t, s, 'b')
+
+	if err := Migrate(dir, "pass123"); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	// The refile: pre-migration v1-sealed bytes under a generation number
+	// the vault has never used (the next free slot).
+	highest := 0
+	for _, n := range GenerationNums(dir) {
+		if n > highest {
+			highest = n
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, manifestName(highest+1)), oldBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s2, err := Open(dir, "pass123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s2.FallbackFromGeneration() != highest+1 {
+		t.Fatalf("refiled generation not flagged as unreadable (fallback = %d, want %d)", s2.FallbackFromGeneration(), highest+1)
+	}
+	if got := s2.Manifest().Refs["refs/heads/main"].OID; got != oidOf('b') {
+		t.Fatalf("rollback succeeded: serving %q, want the post-migration tip", got)
+	}
+}
+
 func TestNewVaultsAreV2AndCommitSealsV2(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "v.coffer")
 	s, err := Create(dir, "pass123", crypto.DefaultParams())

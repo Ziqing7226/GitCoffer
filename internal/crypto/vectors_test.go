@@ -188,6 +188,13 @@ func TestFormatVectors(t *testing.T) {
 	if _, err := OpenManifestV2(vectorDEK(t), v.VaultID, v.ManifestV2.Generation+1, record2); err == nil {
 		t.Fatal("v2 manifest opened under a foreign generation: rollback rejection broken")
 	}
+	// The v1 AAD must not accept a v2-sealed record either: the two seal
+	// versions stay distinct (a refactor falling back to the v1 AAD would
+	// otherwise pass the foreign-generation check while re-opening the
+	// rollback vector).
+	if _, err := OpenManifest(vectorDEK(t), v.VaultID, record2); err == nil {
+		t.Fatal("v2 manifest opened under the v1 AAD")
+	}
 	if _, err := OpenManifest(vectorDEK(t), v.VaultID, record); err != nil {
 		t.Fatalf("vector manifest does not open: %v", err)
 	}

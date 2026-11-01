@@ -336,14 +336,29 @@ func CallerRemoteEffectiveURL(remote string) (string, error) {
 // same config git branch --set-upstream-to writes. The plain command is
 // preferred (it validates); during a helper conversation the
 // remote-tracking ref may not exist yet (git creates it after the
-// conversation ends), so the config form is the fallback.
+// conversation ends), so the config form is the fallback — and the only
+// form for branch names a command line would misparse (a leading dash
+// would be option-parsed by `git branch`; the config form is
+// argument-safe).
 func SetBranchUpstream(branch, remote string) error {
-	if err := exec.Command("git", "branch", "--set-upstream-to="+remote+"/"+branch, branch).Run(); err == nil {
-		return nil
+	if !strings.HasPrefix(branch, "-") {
+		if err := exec.Command("git", "branch", "--set-upstream-to="+remote+"/"+branch, branch).Run(); err == nil {
+			return nil
+		}
 	}
+	// Re-check immediately before writing: the absence guard ran
+	// earlier in the conversation, and a user setting an upstream in
+	// that window must win over the helper.
+	if got := CallerBranchUpstreamRemote(branch); got != "" {
+		return fmt.Errorf("branch %s gained an upstream (%s) during this operation — not touching it", branch, got)
+	}
+	// Write merge before remote: the guard reads .remote, so the config
+	// becomes tracking-complete only at the last write — a failure in
+	// between leaves a state a later attach can still finish, never a
+	// phantom remote.
 	for _, kv := range [][2]string{
-		{"branch." + branch + ".remote", remote},
 		{"branch." + branch + ".merge", "refs/heads/" + branch},
+		{"branch." + branch + ".remote", remote},
 	} {
 		cmd := exec.Command("git", "config", kv[0], kv[1])
 		if out, err := cmd.CombinedOutput(); err != nil {

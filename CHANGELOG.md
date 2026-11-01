@@ -28,8 +28,11 @@
   the coffer remote has a branch of the same name, the helper attaches
   it (`main` -> `origin/main`) and prints what it did plus the undo
   (`git branch --unset-upstream`). Guards, each with a reason: current
-  branch only and only when the push was exactly that branch — never
-  under `--all`/`--mirror`, where "same name exists" carries no intent;
+  branch only, and the batch must have been exactly that branch — the
+  closest available proxy for intent, since git does not tell the helper
+  whether the push was `--all`/`--mirror` (a single-ref `--all` push
+  looks identical to a plain one, and then the branch just pushed is
+  attached while it is the current branch, with the undo printed);
   never when any upstream is configured, so the documented
   host-plus-vault dual-remote flow keeps its tracking; never under a dry
   run; non-bare callers only; a clone mid-fetch is left to git's own
@@ -43,12 +46,18 @@
   vault or actively locked; target non-empty, an existing vault, or
   inside the source. Same-filesystem moves are one atomic rename;
   cross-filesystem moves copy under the source's writer lock and the
-  copy is opened and fscked before success is reported, then the
+  copy is opened and fscked before success is reported (the copy is
+  fsynced first, the writer lock file never travels, and both the
+  rename and the source-removal answer re-check that no writer has
+  appeared in between), then the
   command asks whether to remove the source (declining, or a
   non-interactive run, keeps it as the natural backup). The report
   prints the exact `git remote set-url` line, flags key-file slots
-  whose recorded path the move invalidates, and cautions when the
-  target sits on an online or synced filesystem. The guide's
+  whose recorded path the move invalidates (accurately for slots that
+  carry a content hash and for pre-recognition slots), and cautions —
+  best effort, by filesystem type; some cloud-sync folders report as
+  ordinary local disks and are not detected — when the target sits on
+  an online or synced layer. The guide's
   Maintenance section documents the whole flow, including the key-file
   caveat.
 - Format v2: the manifest AAD additionally binds the generation number
@@ -62,7 +71,27 @@
   resealing leaves it intact). New vaults are created on v2. 1.0.0
   binaries refuse a v2 vault at vault.meta with the explicit
   unsupported-version error — the one-way door the migration command
-  states before acting. The grammar leaves room for the recorded
+- Platform probes: on Linux the filesystem-name probe now resolves the
+  type from /proc/self/mountinfo (statfs only yields magic numbers, so
+  every FUSE/network filesystem — sshfs, rclone, NFS, CIFS — read as
+  "unknown"), which lets doctor report real types and makes move's
+  sync-layer caution fire on network and sync mounts (its list gains
+  sshfs, 9p, Ceph, Gluster, and generic FUSE). Passphrase prompts are
+  now silent when stdin is not a terminal — a scheduled run's passing
+  output is just its summary line, so a cron log or mail stays readable
+  (and the guide's schedule recipes no longer need `>/dev/null`);
+  a failed prompt read says so explicitly instead of surfacing a bare
+  EOF.
+  states before acting. While the migration is running, a v2 vault
+  accepts v1-sealed manifests (the fallback that keeps an interrupted
+  migration readable); when the migration completes, meta records
+  `manifest_seal: 2`, which closes that window — from then on a
+  v1-sealed manifest is damage, so a pre-migration manifest copy
+  (an attacker's earlier image of the medium) re-filed under a fresh
+  generation fails authentication. The marker is plaintext meta, not
+  itself authenticated: editing it reopens the window, but a
+  medium-writer retains plain truncation either way (spec §9, threat
+  model). The grammar leaves room for the recorded
   format-v2 candidates (unknown slot input types and manifest fields
   are skipped by this build's reader) so public-key slots can land
   without a v3.
@@ -70,8 +99,9 @@
   in-place v1→v2 conversion: fsck must pass first, the writer lock is
   held throughout, only meta and manifests are rewritten with the same
   write-temp-and-rename atomicity rekey uses, the result is reopened
-  and fscked before success is reported, and an interrupted run is
-  finished by running it again. Confirmation is required (or `-yes`
+  and fscked before success is reported, and an interrupted run —
+  even one cut off right after the meta flip — is finished by running
+  it again. Confirmation is required (or `-yes`
   for scripts); `status` and `doctor` print an upgrade hint on v1
   vaults. Conformance vectors pin the v2 manifest seal.
 - Key files: migratable paths via content recognition. A key-file slot
@@ -103,7 +133,8 @@
   (objects before manifest, removals after the commit, lock re-verified
   before the destructive tail, concurrent pushes detected and refused
   mid-flight); an interrupted repack leaves a vault that opens, with
-  leftovers the next gc sweeps. The on-disk format is unchanged — v1
+  leftovers the next gc — or a re-run of the repack — sweeps. The
+  on-disk format is unchanged — v1
   vaults stay v1, v2 stay v2 — and the guide/threat-model wording about
   deleted history now points at the command instead of a future
   feature.

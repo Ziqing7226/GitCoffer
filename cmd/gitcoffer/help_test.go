@@ -13,6 +13,12 @@ import (
 	"testing"
 )
 
+// captureStdout runs f with os.Stdout pointed at a pipe and returns
+// what f printed. The drain goroutine starts BEFORE f: the pipe buffer
+// is small on some platforms (Windows anonymous pipes are ~4 KB and
+// fullHelp exceeds it), so a write-drain-then-read order would deadlock
+// windows CI. Restore and close run via defer so a t.Fatal inside f
+// cannot leave the package's stdout pointing at an unclosed pipe.
 func captureStdout(t *testing.T, f func()) string {
 	t.Helper()
 	old := os.Stdout
@@ -21,19 +27,28 @@ func captureStdout(t *testing.T, f func()) string {
 		t.Fatal(err)
 	}
 	os.Stdout = w
-	f()
-	w.Close()
-	os.Stdout = old
-	var sb strings.Builder
-	buf := make([]byte, 8192)
-	for {
-		n, err := r.Read(buf)
-		sb.Write(buf[:n])
-		if err != nil {
-			break
+	done := make(chan string, 1)
+	go func() {
+		buf := make([]byte, 8192)
+		var sb strings.Builder
+		for {
+			n, err := r.Read(buf)
+			sb.Write(buf[:n])
+			if err != nil {
+				done <- sb.String()
+				return
+			}
 		}
-	}
-	return sb.String()
+	}()
+	defer func() {
+		os.Stdout = old
+	}()
+	f()
+	w.Close() // EOF for the drain goroutine (the deferred close is a harmless second close on the t.Fatal path)
+	out := <-done
+	r.Close()
+	os.Stdout = old
+	return out
 }
 
 func TestHelpCoversEveryCommand(t *testing.T) {

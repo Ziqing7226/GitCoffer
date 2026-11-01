@@ -255,9 +255,23 @@ readers:
   generations, never object data.
 - During migration, a v2 vault MAY temporarily hold v1-sealed
   generations: `vault.meta` flips to 2 first, then each generation is
-  resealed. A v2 reader MUST therefore attempt the v2 AAD first and fall
-  back to the v1 AAD (`"coffer/1/manifest/<vault id>"`) per manifest
-  file. Writers MUST always seal per the vault's declared version.
+  resealed. While the window is open, a v2 reader MUST attempt the v2
+  AAD first and fall back to the v1 AAD
+  (`"coffer/1/manifest/<vault id>"`) per manifest file. The plaintext
+  header field `manifest_seal` closes the window: when it is present
+  and `>= 2`, a v1 seal MUST NOT authenticate — the fallback is only
+  permitted while `manifest_seal` is absent or `< 2`. The reference
+  migration sets the field after every generation is resealed and the
+  result is verified; without it, a v1-sealed manifest copy from before
+  the migration (an attacker's earlier image of the medium) re-filed
+  under a fresh generation number would authenticate forever, which is
+  the rollback v2 exists to reject. Writers MUST always seal per the
+  vault's declared version. `manifest_seal` is an optional field of the
+  same class as the other §3 extras (readers written before it ignore
+  it); it lives in plaintext `vault.meta` and is not itself
+  authenticated — a medium-writer who edits it reopens the window, but
+  that adversary retains the plain truncation rollback regardless, so
+  nothing is weakened (§7, threat model).
 
 Extensibility: per §3, readers ignore unrecognized JSON fields and skip
 slots whose `input` they do not implement. Future format-v2 work —

@@ -368,20 +368,45 @@ umask 077
 printf '%s\n' 'your-passphrase' > ~/.coffer-pass
 ```
 
-Windows (PowerShell):
+Windows (PowerShell; the passphrase must be ASCII — see the note below):
 
 ```powershell
 "your-passphrase" | Out-File -Encoding ascii $env:USERPROFILE\.coffer-pass
 ```
 
 Then schedule the checks — a nightly `check` and a monthly `fsck`. On
-Linux and macOS (`crontab -e`); a silent run is a passing run, and cron
-mails you whatever a failing or warning run prints:
+Linux and macOS (`crontab -e`), name the binary by its full path: cron's
+`PATH` is just `/usr/bin:/bin`, so a `gitcoffer` installed in
+`~/.local/bin` (the guide's Install path) or Homebrew's bin directory
+would never run — every night would report a failure that does not
+exist. Each failing run appends the exit code and where to look, and a
+passing run appends its one summary line, to a log file:
 
 ```cron
-30 3 * * * gitcoffer check "/mnt/usb/myproject.coffer" < "$HOME/.coffer-pass" >/dev/null || echo "coffer check FAILED: myproject"
-0 4 1 * * gitcoffer fsck "/mnt/usb/myproject.coffer" < "$HOME/.coffer-pass" >/dev/null || echo "coffer fsck FAILED: myproject"
+30 3 * * * "$HOME/.local/bin/gitcoffer" check "/mnt/usb/myproject.coffer" < "$HOME/.coffer-pass" >> "$HOME/.coffer-check.log" 2>&1 || echo "coffer check FAILED (exit $?) for myproject — see $HOME/.coffer-check.log" >> "$HOME/.coffer-check.log" 2>&1
+0 4 1 * * "$HOME/.local/bin/gitcoffer" fsck "/mnt/usb/myproject.coffer" < "$HOME/.coffer-pass" >> "$HOME/.coffer-check.log" 2>&1 || echo "coffer fsck FAILED (exit $?) for myproject — see $HOME/.coffer-check.log" >> "$HOME/.coffer-check.log" 2>&1
 ```
+
+Scheduling notes, so the check actually reaches you:
+
+- The log-file recipe above needs no mail system. The classic
+  alternative — `|| echo …` alone, relying on cron mailing the output —
+  requires a configured mail agent (sendmail), which most desktop Linux
+  systems and stock macOS lack; without one, the output is silently
+  dropped. On macOS, launchd is the modern scheduler (cron is
+  deprecated but still present), and a cron or launchd job reading
+  files under `~/Documents`, `~/Desktop`, or iCloud Drive needs Full
+  Disk Access — the `~/.coffer-pass` file and `/Volumes/…` vault paths
+  in this recipe are unaffected.
+- An exit code of 1 can also mean the passphrase file was missing or
+  unreadable (the message says so, in the log) — check the log before
+  suspecting the vault.
+- If you prefer cron mail after all, drop the `>> … 2>&1` redirects:
+  prompts are silent for non-interactive runs, so a passing run prints
+  only its summary line.
+
+Windows: Task Scheduler records the exit code as the task's Last Run
+Result (0 = the vault opened):
 
 On Windows, Task Scheduler records the exit code as the task's Last
 Run Result (0 = the vault opened):
@@ -389,6 +414,15 @@ Run Result (0 = the vault opened):
 ```bat
 schtasks /create /tn "Coffer check" /sc daily /st 03:30 /tr "powershell -NoProfile -Command ""Get-Content $env:USERPROFILE\.coffer-pass | gitcoffer check D:\backups\myproject.coffer"""
 ```
+
+Two encoding caveats for the Windows recipe. First, `Out-File
+-Encoding ascii` silently replaces every non-ASCII character with `?`,
+and a passphrase containing a double quote needs quoting care in both
+the file and the `/tr` line — for a passphrase with anything beyond
+plain ASCII letters, digits, and punctuation, use pwsh 7 instead of
+`powershell` (5.1): write the file with `utf8NoBOM` and pipe through
+pwsh 7 as well. Second, an ASCII-only passphrase round-trips exactly;
+there is nothing to configure.
 
 ### Moving a vault
 
