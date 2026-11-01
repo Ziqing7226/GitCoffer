@@ -344,15 +344,9 @@ func TestCommitQuarantinesDamagedOccupant(t *testing.T) {
 // by a v2-sealed one. (In a window-closed v2 vault a v1-SEALED occupant
 // is plain damage — quarantine is correct there.)
 func TestCommitRefusesNewerManifestVersion(t *testing.T) {
-	build := func(t *testing.T, format int) (*Store, string, []byte) {
+	build := func(t *testing.T, format int) (*Store, string) {
 		dir := t.TempDir()
-		var s *Store
-		var err error
-		if format == crypto.FormatVersion {
-			s, err = CreateFormat(dir, "pass", weakParams(), format)
-		} else {
-			s, err = CreateFormat(dir, "pass", weakParams(), format)
-		}
+		s, err := CreateFormat(dir, "pass", weakParams(), format)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -376,10 +370,10 @@ func TestCommitRefusesNewerManifestVersion(t *testing.T) {
 			t.Fatal(err)
 		}
 		s.manifestNum = gen - 1
-		return s, path, []byte{}
+		return s, path
 	}
 	for _, format := range []int{crypto.FormatVersion, crypto.FormatVersionV2} {
-		s, path, _ := build(t, format)
+		s, path := build(t, format)
 		m := s.Manifest()
 		m.Refs["refs/heads/main"] = RefVal{OID: strings.Repeat("e", 40)}
 		err := s.Commit(m)

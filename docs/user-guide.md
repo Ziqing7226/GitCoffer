@@ -408,9 +408,6 @@ Scheduling notes, so the check actually reaches you:
 Windows: Task Scheduler records the exit code as the task's Last Run
 Result (0 = the vault opened):
 
-On Windows, Task Scheduler records the exit code as the task's Last
-Run Result (0 = the vault opened):
-
 ```bat
 schtasks /create /tn "Coffer check" /sc daily /st 03:30 /tr "powershell -NoProfile -Command ""Get-Content $env:USERPROFILE\.coffer-pass | gitcoffer check D:\backups\myproject.coffer"""
 ```

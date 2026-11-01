@@ -33,6 +33,12 @@ func fstypeFromMountinfo(path string) (string, bool) {
 	if err != nil {
 		return "", false
 	}
+	// The mountinfo match is lexical, so resolve symlinks first: a vault
+	// reached through one (e.g. /media/usb -> /run/media/user/USB) would
+	// otherwise match only the root mount and report the root's type.
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		path = resolved
+	}
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return "", false

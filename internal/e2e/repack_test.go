@@ -8,8 +8,10 @@ package e2e
 // round-trip untouched.
 
 import (
+	"bytes"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -126,4 +128,132 @@ func vaultGenerationNums(t *testing.T, dir string) []int {
 		}
 	}
 	return gens
+}
+
+// runGitcofferEnv is runGitcoffer with extra environment (the crash
+// harness rides it).
+func runGitcofferEnv(t *testing.T, stdin string, env []string, args ...string) (string, error) {
+	t.Helper()
+	cmd := execCommand(filepath.Join(binDir, "gitcoffer"+exeExt()), args...)
+	cmd.Stdin = strings.NewReader(stdin)
+	cmd.Env = append(os.Environ(), env...)
+	var out bytes.Buffer
+	cmd.Stdout, cmd.Stderr = &out, &out
+	err := cmd.Run()
+	return out.String(), err
+}
+
+func execCommand(name string, args ...string) *exec.Cmd { return exec.Command(name, args...) }
+
+// Crash safety of the repack, with the same fault-injection discipline
+// as the push path: a crash at any write stage leaves a vault that
+// opens, holds the pre-repack refs, passes fsck, and converges when the
+// repack (or a plain gc) runs again.
+func TestGcRepackCrashPoints(t *testing.T) {
+	for _, point := range []string{
+		"after-object-write",
+		"after-object-rename",
+		"before-manifest-commit",
+		"after-manifest-write",
+		"after-manifest-commit",
+	} {
+		t.Run(point, func(t *testing.T) {
+			vaultDir := newVault(t)
+			src := newRepo(t, "src")
+			git(t, src, nil, "remote", "add", "origin", vaultURL(vaultDir))
+			commit(t, src, "secret.txt", "deleted-branch-payload\n", "commit secret")
+			git(t, src, nil, "push", "-q", "-u", "origin", "HEAD:refs/heads/feature")
+			git(t, src, nil, "push", "-q", "origin", "HEAD:refs/heads/main")
+			git(t, src, nil, "push", "-q", "origin", ":refs/heads/feature")
+			mainTip := rev(t, src, "main")
+
+			_, err := runGitcofferEnv(t, passphrase+"\n", []string{"COFFER_CRASH=" + point}, "gc", "--repack", vaultDir)
+			if err == nil {
+				t.Fatal("crash point did not fire")
+			}
+
+			// Invariant: the vault opens, keeps the pre-repack refs, and
+			// fsck reports no errors.
+			s := openVault(t, vaultDir)
+			if got := s.Manifest().Refs["refs/heads/main"].OID; got != mainTip {
+				t.Fatalf("refs damaged by the crash: %s", got)
+			}
+			out, err := runGitcoffer(t, passphrase+"\n", "fsck", vaultDir)
+			if err != nil {
+				t.Fatalf("fsck after crash: %v\n%s", err, out)
+			}
+
+			// Convergence: another repack finishes the job cleanly.
+			if _, err := runGitcoffer(t, passphrase+"\n", "gc", "--repack", vaultDir); err != nil {
+				t.Fatalf("converging repack: %v", err)
+			}
+			s = openVault(t, vaultDir)
+			if len(s.Manifest().Packs) != 1 {
+				t.Fatalf("packs after converging repack = %d, want 1", len(s.Manifest().Packs))
+			}
+		})
+	}
+}
+
+// Idempotence and shape: repacking twice is safe, keeps every branch
+// and tag, and the plaintext pack never outlives the command (the
+// %TEMP% leak the temp cleanup fixed).
+func TestGcRepackIdempotentAndClean(t *testing.T) {
+	countRepackTemps := func() int {
+		matches, _ := filepath.Glob(filepath.Join(os.TempDir(), "coffer-repack-*"))
+		return len(matches)
+	}
+
+	vaultDir := newVault(t)
+	src := newRepo(t, "src")
+	commit(t, src, "file.txt", "one\ntwo\n", "commit two")
+	git(t, src, nil, "branch", "feature")
+	commit(t, src, "feature.txt", "feature\n", "commit feature")
+	git(t, src, nil, "tag", "-a", "v1", "-m", "tag")
+	git(t, src, nil, "remote", "add", "origin", vaultURL(vaultDir))
+	git(t, src, nil, "push", "-q", "--all", "origin")
+	git(t, src, nil, "push", "-q", "--tags", "origin")
+
+	before := countRepackTemps()
+	for i := 0; i < 2; i++ {
+		if out, err := runGitcoffer(t, passphrase+"\n", "gc", "--repack", vaultDir); err != nil {
+			t.Fatalf("repack run %d: %v\n%s", i+1, err, out)
+		}
+	}
+	s := openVault(t, vaultDir)
+	if len(s.Manifest().Packs) != 1 {
+		t.Fatalf("packs after two repacks = %d, want 1", len(s.Manifest().Packs))
+	}
+	for _, want := range []string{"refs/heads/main", "refs/heads/feature", "refs/tags/v1"} {
+		if _, ok := s.Manifest().Refs[want]; !ok {
+			t.Errorf("ref %s lost by the repacks", want)
+		}
+	}
+	// Every ref must survive a fresh clone, tags included.
+	fresh := filepath.Join(t.TempDir(), "fresh")
+	git(t, t.TempDir(), nil, "clone", "-q", vaultURL(vaultDir), fresh)
+	if rev(t, fresh, "refs/tags/v1") != rev(t, src, "v1") {
+		t.Fatal("tag mismatch after repack")
+	}
+	if after := countRepackTemps(); after != before {
+		t.Errorf("repack leaked %d temp dir(s): %d -> %d", after-before, before, after)
+	}
+
+	// A fallback-served vault is refused: repair first, repack after.
+	// (The repack leaves one generation, so first push another one to
+	// damage — a single-generation vault has no fallback state at all.)
+	commit(t, src, "file.txt", "one\ntwo\nthree\n", "commit three")
+	git(t, src, nil, "push", "-q", "origin", "main")
+	gen := openVault(t, vaultDir).ManifestNum()
+	path := filepath.Join(vaultDir, fmt.Sprintf("manifest.%d", gen))
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw[len(raw)-1] ^= 0x80
+	os.WriteFile(path, raw, 0o600)
+	out, err := runGitcoffer(t, passphrase+"\n", "gc", "--repack", vaultDir)
+	if err == nil || !strings.Contains(out, "fsck") {
+		t.Fatalf("repack on a fallback-served vault = %v\n%s, want an fsck refusal", err, out)
+	}
 }

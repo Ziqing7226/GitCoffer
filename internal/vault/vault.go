@@ -458,6 +458,12 @@ func (s *Store) verifyLockHeld() error {
 // changes other writers committed since Open. Fallback tracking matches
 // Open: a damaged newest generation is surfaced via
 // FallbackFromGeneration instead of silently serving older state.
+// Reload reads manifests only, not vault.meta: a session that opened a
+// v1 vault before `gitcoffer migrate` flipped meta will fail its next
+// locked operation cleanly (its v1-seal view cannot authenticate the
+// resealed generations) — the caller retries with a fresh Open. Commit
+// never rewrites meta, so no corruption or downgrade is possible from
+// that abort.
 func (s *Store) Reload() error {
 	var lastErr error
 	var highestFailed int

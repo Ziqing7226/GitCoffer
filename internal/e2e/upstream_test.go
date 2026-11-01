@@ -124,3 +124,51 @@ func TestUpstreamAutoAttachEndToEnd(t *testing.T) {
 		t.Fatalf("clone's own tracking missing: %q", got)
 	}
 }
+
+// The caller-shape guards end to end: bare repositories and detached
+// HEAD have no current branch to attach, so nothing is written.
+func TestUpstreamGuardsCallerShapes(t *testing.T) {
+	vaultDir := newVault(t)
+	src := newRepo(t, "src")
+	commit(t, src, "file.txt", "one\ntwo\n", "commit two")
+	git(t, src, nil, "remote", "add", "origin", vaultURL(vaultDir))
+	git(t, src, nil, "push", "-q", "origin", "main")
+
+	// A bare clone: push works, no attach (no current branch).
+	bare := filepath.Join(t.TempDir(), "bare")
+	git(t, t.TempDir(), nil, "clone", "-q", "--bare", vaultURL(vaultDir), bare)
+	git(t, bare, nil, "config", "user.name", testGitName)
+	git(t, bare, nil, "config", "user.email", testGitMail)
+	// A bare repo has no work tree (even --allow-empty commits refuse):
+	// plumbing builds the push payload — a child commit of the current
+	// tip on main, so the push is a fast-forward.
+	parent := rev(t, bare, "refs/heads/main")
+	tree := strings.TrimSpace(git(t, bare, nil, "mktree"))
+	c := strings.TrimSpace(git(t, bare, nil, "commit-tree", tree, "-p", parent, "-m", "from bare"))
+	git(t, bare, nil, "update-ref", "refs/heads/main", c)
+	out := git(t, bare, nil, "push", "origin", "main")
+	if strings.Contains(out, "now tracks") {
+		t.Fatalf("bare caller attached: %s", out)
+	}
+	if got := upstreamRemoteOf(t, bare, "main"); got != "" {
+		t.Fatalf("bare caller gained tracking: %q", got)
+	}
+
+	// Detached HEAD: push works, no attach.
+	detached := filepath.Join(t.TempDir(), "detached")
+	git(t, t.TempDir(), nil, "clone", "-q", vaultURL(vaultDir), detached)
+	git(t, detached, nil, "config", "user.name", testGitName)
+	git(t, detached, nil, "config", "user.email", testGitMail)
+	git(t, detached, nil, "checkout", "-q", "--detach", "HEAD")
+	commit(t, detached, "file.txt", "one\ntwo\nthree\n", "detached commit")
+	out = git(t, detached, nil, "push", "origin", "HEAD:refs/heads/main")
+	if strings.Contains(out, "now tracks") {
+		t.Fatalf("detached caller attached: %s", out)
+	}
+	// The clone's own tracking (branch.main.remote = origin from the
+	// clone) must be untouched — the guard neither attaches on a
+	// detached HEAD nor rewrites existing tracking.
+	if got := upstreamRemoteOf(t, detached, "main"); got != "origin" {
+		t.Fatalf("clone tracking changed: %q", got)
+	}
+}

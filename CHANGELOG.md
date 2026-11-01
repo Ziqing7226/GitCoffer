@@ -7,7 +7,8 @@
   `coffer::` URL form, every command with its arguments and behavior,
   how passphrase prompts behave under a non-terminal stdin, and the
   exit codes — so a person or a program can operate the CLI without
-  opening the documentation. Usage errors exit 2 and per-command usage
+  opening the documentation. Usage errors exit 2 — unknown commands,
+  wrong argument counts, and bad flags alike — and per-command usage
   lines point at the matching help section; `-h` on a subcommand exits
   0 instead of reporting a flag error.
 - CLI: `gitcoffer check <vault-directory>` — the three-state probe from
@@ -71,17 +72,6 @@
   resealing leaves it intact). New vaults are created on v2. 1.0.0
   binaries refuse a v2 vault at vault.meta with the explicit
   unsupported-version error — the one-way door the migration command
-- Platform probes: on Linux the filesystem-name probe now resolves the
-  type from /proc/self/mountinfo (statfs only yields magic numbers, so
-  every FUSE/network filesystem — sshfs, rclone, NFS, CIFS — read as
-  "unknown"), which lets doctor report real types and makes move's
-  sync-layer caution fire on network and sync mounts (its list gains
-  sshfs, 9p, Ceph, Gluster, and generic FUSE). Passphrase prompts are
-  now silent when stdin is not a terminal — a scheduled run's passing
-  output is just its summary line, so a cron log or mail stays readable
-  (and the guide's schedule recipes no longer need `>/dev/null`);
-  a failed prompt read says so explicitly instead of surfacing a bare
-  EOF.
   states before acting. While the migration is running, a v2 vault
   accepts v1-sealed manifests (the fallback that keeps an interrupted
   migration readable); when the migration completes, meta records
@@ -95,6 +85,17 @@
   format-v2 candidates (unknown slot input types and manifest fields
   are skipped by this build's reader) so public-key slots can land
   without a v3.
+- Platform probes: on Linux the filesystem-name probe now resolves the
+  type from /proc/self/mountinfo (statfs only yields magic numbers, so
+  every FUSE/network filesystem — sshfs, rclone, NFS, CIFS — read as
+  "unknown"), which lets doctor report real types and makes move's
+  sync-layer caution fire on network and sync mounts (its list gains
+  sshfs, 9p, Ceph, Gluster, and generic FUSE). Passphrase prompts are
+  now silent when stdin is not a terminal — a scheduled run's passing
+  output is just its summary line, so a cron log or mail stays readable
+  (and the guide's schedule recipes no longer need `>/dev/null`);
+  a failed prompt read says so explicitly instead of surfacing a bare
+  EOF.
 - CLI: `gitcoffer migrate [-yes] <vault-directory>` — the explicit,
   in-place v1→v2 conversion: fsck must pass first, the writer lock is
   held throughout, only meta and manifests are rewritten with the same

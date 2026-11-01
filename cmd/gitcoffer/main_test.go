@@ -58,6 +58,8 @@ func TestDocsMentionEveryCommand(t *testing.T) {
 	}
 	readme := read("../../README.md")
 	guide := read("../../docs/user-guide.md")
+	arch := read("../../docs/architecture.md")
+	agents := read("../../AGENTS.md")
 
 	for _, cmd := range implementedCommands {
 		// The guide is the complete reference; the README carries the
@@ -72,6 +74,15 @@ func TestDocsMentionEveryCommand(t *testing.T) {
 		}
 		if !strings.Contains(readme, "gitcoffer "+name) {
 			t.Errorf("README.md never mentions `gitcoffer %s`", cmd)
+		}
+		// The architecture table and the AGENTS CLI list are
+		// kept-in-sync surfaces too (a command omitted there once
+		// slipped through).
+		if !strings.Contains(arch, "`"+cmd+"`") && !strings.Contains(arch, "gitcoffer "+name) {
+			t.Errorf("docs/architecture.md never mentions `%s`", cmd)
+		}
+		if !strings.Contains(agents, cmd) {
+			t.Errorf("AGENTS.md never mentions `%s`", cmd)
 		}
 	}
 }
@@ -178,9 +189,10 @@ func captureCompletion(t *testing.T, shell string) string {
 	}()
 	defer func() {
 		os.Stdout = old
+		w.Close() // EOF for the drain goroutine if the command exits via t.Fatal
 	}()
 	err = completionCmd([]string{shell})
-	w.Close() // EOF for the drain goroutine (the deferred close is a harmless second close on the t.Fatal path)
+	w.Close() // EOF for the drain goroutine on the normal path
 	out := <-done
 	r.Close()
 	os.Stdout = old
@@ -207,6 +219,14 @@ func TestCompletionCoversEveryCommand(t *testing.T) {
 		out := captureCompletion(t, shell)
 		if !strings.Contains(out, want) {
 			t.Errorf("%s completion lacks %q:\n%s", shell, want, out)
+		}
+		// Every shell's script must offer every implemented command,
+		// not just the anchor shape above (a command added to one
+		// script but missed in another fails here).
+		for _, cmd := range implementedCommands {
+			if !strings.Contains(out, cmd) {
+				t.Errorf("%s completion lacks command %q", shell, cmd)
+			}
 		}
 	}
 	if _, err := captureCompletionErr(t, "tcsh"); err == nil {

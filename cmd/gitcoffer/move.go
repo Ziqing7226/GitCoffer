@@ -32,7 +32,7 @@ func moveCmd(args []string) error {
 		fmt.Fprintln(os.Stderr, usageHint("move"))
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	if fs.NArg() != 2 {

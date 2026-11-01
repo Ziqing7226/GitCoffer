@@ -233,8 +233,10 @@ func findCommandDoc(name string) *commandDoc {
 // helpUsage is the invocation line shown for one command.
 func helpUsage(name string) string {
 	switch name {
-	case "init", "status", "rekey", "fsck", "doctor", "check":
+	case "init", "status", "fsck", "doctor", "check":
 		return "gitcoffer " + name + " <vault-directory>"
+	case "rekey":
+		return "gitcoffer rekey [-kdf m=…,t=…,p=…] <vault-directory>"
 	case "move":
 		return "gitcoffer move <vault-directory> <new-path>"
 	case "migrate":
@@ -242,11 +244,11 @@ func helpUsage(name string) string {
 	case "backoff":
 		return "gitcoffer backoff <on|off> <vault-directory>"
 	case "key":
-		return "gitcoffer key add [-keyfile <path>] <vault-directory>\n    " +
+		return "gitcoffer key add [-keyfile <path>] [-kdf m=…,t=…,p=…] <vault-directory>\n    " +
 			"gitcoffer key remove <vault-directory> <slot-id>\n    " +
 			"gitcoffer key list <vault-directory>"
 	case "gc":
-		return "gitcoffer gc [--prune] <vault-directory>"
+		return "gitcoffer gc [--prune] [--repack] <vault-directory>"
 	case "export-bundle":
 		return "gitcoffer export-bundle <vault-directory> <output.bundle>"
 	case "version":

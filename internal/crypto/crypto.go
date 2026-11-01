@@ -357,5 +357,6 @@ func Hash(data []byte) string {
 
 // ValidateParams checks Argon2id parameters against the format's bounds
 // (the ceilings that keep a planted vault.meta from grinding unbounded
-// work). CLI cost selection uses it to fail before prompting.
+// work). The CLI's -kdf selection validates through it before opening
+// the vault or prompting for any passphrase.
 func ValidateParams(p Argon2Params) error { return p.validate() }

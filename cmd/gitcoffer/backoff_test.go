@@ -230,3 +230,24 @@ func TestKDFParamsReachTheSlot(t *testing.T) {
 		t.Fatalf("weaker choice did not warn:\n%s", gotStderr)
 	}
 }
+
+// The production wiring of the interactive backoff: openVaultInteractive
+// gates retries on a terminal stdin. Under a pipe (what every script and
+// this test has), a backoff-enabled vault still gets the single classic
+// shot — a wrong passphrase surfaces as the auth failure itself, never
+// as the EOF of a second prompt.
+func TestOpenVaultInteractiveNonTerminalSingleShot(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "v.coffer")
+	if _, err := vault.Create(dir, "right", crypto.DefaultParams()); err != nil {
+		t.Fatal(err)
+	}
+	feedStdin(t, "right\n")
+	if err := backoffCmd([]string{"on", dir}); err != nil {
+		t.Fatal(err)
+	}
+	feedStdin(t, "wrong\n")
+	_, _, err := openVaultInteractive(dir)
+	if !errors.Is(err, crypto.ErrAuth) {
+		t.Fatalf("non-terminal open = %v, want the plain auth failure (no retry)", err)
+	}
+}

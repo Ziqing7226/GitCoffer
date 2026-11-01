@@ -172,7 +172,7 @@ func main() {
 func versionCmd(args []string) error {
 	fs := flag.NewFlagSet("version", flag.ContinueOnError)
 	asJSON := fs.Bool("json", false, "print the version as a JSON object")
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	if fs.NArg() != 0 {
@@ -197,11 +197,12 @@ func usage() {
 
   gitcoffer init <vault-directory>              create a new encrypted vault
   gitcoffer status <vault-directory>            inspect a vault (refs need the passphrase)
-  gitcoffer rekey <vault-directory>             change the passphrase of the slot it opens
-  gitcoffer key add [-keyfile <path>] <dir>     add a key slot
+  gitcoffer rekey [-kdf m=…,t=…,p=…] <dir>      change the passphrase of the slot it opens
+  gitcoffer key add [-keyfile <path>] [-kdf …] <dir>
+                                                add a key slot
   gitcoffer key remove <dir> <slot-id>          remove a key slot (never the last one)
   gitcoffer key list <dir>                      list key slots (no passphrase needed)
-  gitcoffer gc [--prune] <dir>                  remove orphaned objects, temp files, old generations (default: report only)
+  gitcoffer gc [--prune] [--repack] <dir>       remove orphans/temp/old generations; --repack rebuilds the packs (default: report only)
   gitcoffer fsck <vault-directory>              verify every structure of the vault
   gitcoffer doctor <vault-directory>            check the environment and the vault, and report
   gitcoffer check <vault-directory>             probe for scripts: 0 opens, 1 vault that does not open, 100 not a vault
@@ -223,7 +224,7 @@ func initCmd(args []string) error {
 		fmt.Fprintln(os.Stderr, usageHint("init"))
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	if fs.NArg() != 1 {
@@ -273,7 +274,7 @@ func statusCmd(args []string) error {
 		fmt.Fprintln(os.Stderr, usageHint("status"))
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	if fs.NArg() != 1 {
@@ -437,6 +438,19 @@ func realBackoffDelay(attempt int) {
 	time.Sleep(d)
 }
 
+// parseFlags parses a command's flags, mapping every parse failure to
+// the usage-error exit code (2) — the stated contract in the help text
+// — while flag.ErrHelp keeps its own exit-0 handling in main.
+func parseFlags(fs *flag.FlagSet, args []string) error {
+	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return err
+		}
+		return fmt.Errorf("%w: %v", errUsage, err)
+	}
+	return nil
+}
+
 func vaultDirArg(fs *flag.FlagSet) string {
 	if fs.NArg() != 1 {
 		fs.Usage()
@@ -453,11 +467,16 @@ func rekeyCmd(args []string) error {
 		fmt.Fprintln(os.Stderr, usageHint("rekey"))
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	dir := vaultDirArg(fs)
 
+	params, err := parseKDFParams(*kdf)
+	if err != nil {
+		return err
+	}
+	warnIfWeakerThanDefault(params)
 	s, err := openWithPrompt(dir)
 	if err != nil {
 		return err
@@ -466,11 +485,6 @@ func rekeyCmd(args []string) error {
 	if err != nil {
 		return err
 	}
-	params, err := parseKDFParams(*kdf)
-	if err != nil {
-		return err
-	}
-	warnIfWeakerThanDefault(params)
 	if err := s.RekeyParams(newPass, params); err != nil {
 		return err
 	}
@@ -488,11 +502,16 @@ func keyAddCmd(args []string) error {
 		fmt.Fprintln(os.Stderr, usageHint("key add"))
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	dir := vaultDirArg(fs)
 
+	params, err := parseKDFParams(*kdf)
+	if err != nil {
+		return err
+	}
+	warnIfWeakerThanDefault(params)
 	s, err := openWithPrompt(dir)
 	if err != nil {
 		return err
@@ -501,11 +520,6 @@ func keyAddCmd(args []string) error {
 	if err != nil {
 		return err
 	}
-	params, err := parseKDFParams(*kdf)
-	if err != nil {
-		return err
-	}
-	warnIfWeakerThanDefault(params)
 	_, statErr := os.Stat(*keyfile)
 	created := *keyfile != "" && statErr != nil
 	id, err := s.AddSlotParams(newPass, *keyfile, params)
@@ -533,7 +547,7 @@ func keyRemoveCmd(args []string) error {
 		fmt.Fprintln(os.Stderr, usageHint("key remove"))
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	if fs.NArg() != 2 {
@@ -564,7 +578,7 @@ func keyListCmd(args []string) error {
 		fmt.Fprintln(os.Stderr, usageHint("key list"))
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	dir := vaultDirArg(fs)
@@ -599,7 +613,7 @@ func gcCmd(args []string) error {
 		fmt.Fprintln(os.Stderr, usageHint("gc"))
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	dir := vaultDirArg(fs)
@@ -671,7 +685,7 @@ func fsckCmd(args []string) error {
 		fmt.Fprintln(os.Stderr, usageHint("fsck"))
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	dir := vaultDirArg(fs)

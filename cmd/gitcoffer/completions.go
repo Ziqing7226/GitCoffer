@@ -14,7 +14,7 @@ import (
 const bashCompletion = `# bash completion for gitcoffer
 _gitcoffer() {
 	local commands="init status rekey key gc fsck doctor check move migrate backoff export-bundle version completion help"
-	local gc_opts="--prune --repack" key_opts="--keyfile" ver_opts="--json" global_opts="-h --help"
+	local gc_opts="--prune --repack" key_opts="--keyfile --kdf" rekey_opts="--kdf" migrate_opts="--yes" ver_opts="--json" global_opts="-h --help"
 	if [[ $COMP_CWORD -eq 1 ]]; then
 		COMPREPLY=( $(compgen -W "$commands" -- "$2") )
 		return
@@ -23,6 +23,8 @@ _gitcoffer() {
 	case ${COMP_WORDS[1]} in
 		gc)       COMPREPLY=( $(compgen -W "$gc_opts" -- "$2") ) ;;
 		key)      [[ $COMP_CWORD -eq 2 ]] && COMPREPLY=( $(compgen -W "add remove list" -- "$2") ) || COMPREPLY=( $(compgen -W "$key_opts" -- "$2") ) ;;
+		rekey)    COMPREPLY=( $(compgen -W "$rekey_opts" -- "$2") ) ;;
+		migrate)  COMPREPLY=( $(compgen -W "$migrate_opts" -- "$2") ) ;;
 		version)  COMPREPLY=( $(compgen -W "$ver_opts" -- "$2") ) ;;
 		*)        COMPREPLY=( $(compgen -W "$global_opts" -- "$2") ) ;;
 	esac
@@ -63,7 +65,9 @@ _gitcoffer() {
 		args)
 			case $words[2] in
 				gc) _values 'option' --prune --repack ;;
-				key) [[ $CURRENT -eq 3 ]] && _values 'subcommand' add remove list || _files ;;
+				key) [[ $CURRENT -eq 3 ]] && _values 'subcommand' add remove list || _values 'option' --keyfile --kdf ;;
+				rekey) _values 'option' --kdf ;;
+				migrate) _values 'option' --yes ;;
 				version) _values 'option' --json ;;
 				completion) _values 'shell' bash zsh fish powershell ;;
 				*) _files ;;
@@ -101,6 +105,10 @@ complete -c gitcoffer -n '__fish_use_subcommand' -a version -d 'print the build 
 complete -c gitcoffer -n '__fish_use_subcommand' -a help -d 'print detailed usage'
 complete -c gitcoffer -n '__fish_seen_subcommand_from gc' -l prune -d 'actually delete what gc finds'
 complete -c gitcoffer -n '__fish_seen_subcommand_from gc' -l repack -d 'rebuild packs so deleted history physically leaves the medium'
+complete -c gitcoffer -n '__fish_seen_subcommand_from key; and __fish_seen_subcommand_from add' -l keyfile -d 'require a key file as a second factor'
+complete -c gitcoffer -n '__fish_seen_subcommand_from key; and __fish_seen_subcommand_from add' -l kdf -d 'Argon2id cost m=,t=,p='
+complete -c gitcoffer -n '__fish_seen_subcommand_from rekey' -l kdf -d 'Argon2id cost m=,t=,p='
+complete -c gitcoffer -n '__fish_seen_subcommand_from migrate' -l yes -d 'confirm the one-way migration without a prompt'
 complete -c gitcoffer -n '__fish_seen_subcommand_from key; and not __fish_seen_subcommand_from add; and not __fish_seen_subcommand_from remove; and not __fish_seen_subcommand_from list' -a 'add remove list'
 complete -c gitcoffer -n '__fish_seen_subcommand_from version' -l json -d 'print JSON'
 `
@@ -126,6 +134,14 @@ Register-ArgumentCompleter -CommandName gitcoffer -Native -ScriptBlock {
 			'--prune','--repack' | Where-Object { $_ -like "$wordToComplete*" } |
 				ForEach-Object { [System.Management.Automation.CompletionResult]::new($_) }
 		}
+		{$_ -in 'key','rekey'} {
+			'--keyfile','--kdf' | Where-Object { $_ -like "$wordToComplete*" } |
+				ForEach-Object { [System.Management.Automation.CompletionResult]::new($_) }
+		}
+		'migrate' {
+			'--yes' | Where-Object { $_ -like "$wordToComplete*" } |
+				ForEach-Object { [System.Management.Automation.CompletionResult]::new($_) }
+		}
 		'version' {
 			'--json' | Where-Object { $_ -like "$wordToComplete*" } |
 				ForEach-Object { [System.Management.Automation.CompletionResult]::new($_) }
@@ -141,7 +157,7 @@ func completionCmd(args []string) error {
 		fmt.Fprintln(os.Stderr, usageHint("completion"))
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	if fs.NArg() != 1 {

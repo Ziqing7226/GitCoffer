@@ -135,3 +135,81 @@ func TestRekeyRefreshesKeyfileID(t *testing.T) {
 		t.Fatalf("key-file slot broken after rekey: %v", err)
 	}
 }
+
+// TestPreRecognitionSlotGetsNoRecognition pins the honest boundary: a
+// slot without keyfile_id (made by a pre-1.1.0 binary, or stripped) is
+// NOT recognized by content — the file sitting next to the vault does
+// not satisfy it.
+func TestPreRecognitionSlotGetsNoRecognition(t *testing.T) {
+	home := t.TempDir()
+	vaultDir := filepath.Join(home, "v.coffer")
+	s, err := CreateFormat(vaultDir, "pass", weakParams(), crypto.CurrentFormatVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyfile := filepath.Join(home, "coffer.key")
+	if err := os.WriteFile(keyfile, []byte("0123456789abcdef0123456789abcdef"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddSlot("second", keyfile); err != nil {
+		t.Fatal(err)
+	}
+	// Strip the recorded hash — the pre-1.1.0 slot shape.
+	s2, err := Open(vaultDir, "pass")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range s2.meta.Slots {
+		s2.meta.Slots[i].KeyfileID = ""
+	}
+	if err := s2.rewriteMeta(); err != nil {
+		t.Fatal(err)
+	}
+
+	// The recorded path dies, but a byte-identical copy sits right next
+	// to the vault under a new name — recognition territory. A hash-less
+	// slot must not use it.
+	if err := os.Rename(keyfile, filepath.Join(home, "renamed.key")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Open(vaultDir, "second"); err == nil {
+		t.Fatal("a pre-recognition slot opened via content recognition")
+	}
+	// Restoring the file at its recorded path works, as documented.
+	if err := os.Rename(filepath.Join(home, "renamed.key"), keyfile); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Open(vaultDir, "second"); err != nil {
+		t.Fatalf("slot broken with the key file back at its recorded path: %v", err)
+	}
+}
+
+// TestKeyfileRecognizedInsideVault covers the search's second scope: the
+// key file copied INTO the vault directory (e.g. the whole drive content
+// reorganized) is found there when the recorded path is gone.
+func TestKeyfileRecognizedInsideVault(t *testing.T) {
+	home := t.TempDir()
+	vaultDir := filepath.Join(home, "v.coffer")
+	s, err := CreateFormat(vaultDir, "pass", weakParams(), crypto.CurrentFormatVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keyfile := filepath.Join(home, "coffer.key")
+	if err := os.WriteFile(keyfile, []byte("0123456789abcdef0123456789abcdef"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.AddSlot("second", keyfile); err != nil {
+		t.Fatal(err)
+	}
+	// The key file moves into the vault directory; the recorded path dies.
+	if err := os.Rename(keyfile, filepath.Join(vaultDir, "coffer.key")); err != nil {
+		t.Fatal(err)
+	}
+	s2, err := Open(vaultDir, "second")
+	if err != nil {
+		t.Fatalf("key file inside the vault not recognized: %v", err)
+	}
+	if s2.OpenedSlotID() != 1 {
+		t.Fatalf("opened slot %d, want the key-file slot", s2.OpenedSlotID())
+	}
+}

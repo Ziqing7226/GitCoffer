@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Ziqing7226/GitCoffer/internal/crypto"
 	"github.com/Ziqing7226/GitCoffer/internal/vault"
 )
 
@@ -81,7 +82,7 @@ func checkCmd(args []string) error {
 		fmt.Fprintln(os.Stderr, usageHint("check"))
 		fs.PrintDefaults()
 	}
-	if err := fs.Parse(args); err != nil {
+	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
 	dir := vaultDirArg(fs)
@@ -91,6 +92,14 @@ func checkCmd(args []string) error {
 	}
 	_, pass, err := openVaultInteractive(dir)
 	if err != nil {
+		if errors.Is(err, crypto.ErrAuth) {
+			// The three-state contract needs the summary, not the raw
+			// open error: state 1 with the same wording checkState uses.
+			fmt.Printf("vault does not open: %v\n", err)
+			os.Exit(checkDoesNotOpen)
+		}
+		// A failed prompt read names itself (openWithRetries); surface it
+		// as the exit-1 "did not run" failure it is.
 		return err
 	}
 	code, summary, warnings := checkState(dir, pass)

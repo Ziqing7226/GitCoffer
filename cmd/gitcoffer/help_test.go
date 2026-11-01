@@ -42,9 +42,10 @@ func captureStdout(t *testing.T, f func()) string {
 	}()
 	defer func() {
 		os.Stdout = old
+		w.Close() // EOF for the drain goroutine if f() exits via t.Fatal
 	}()
 	f()
-	w.Close() // EOF for the drain goroutine (the deferred close is a harmless second close on the t.Fatal path)
+	w.Close() // EOF for the drain goroutine on the normal path
 	out := <-done
 	r.Close()
 	os.Stdout = old

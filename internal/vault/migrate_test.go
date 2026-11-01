@@ -139,9 +139,6 @@ func TestRollbackRefilingV1SilentV2Rejected(t *testing.T) {
 		}
 		commitGeneration(t, s, 'a')
 		commitGeneration(t, s, 'b')
-		if format == crypto.FormatVersionV2 {
-			// v2 vaults are already v2 everywhere; nothing more to do.
-		}
 		// The attack: re-file generation 2's bytes under generation 3.
 		// (kept=2, so generations 2 and 3 are the ones on disk.)
 		gen2, err := os.ReadFile(filepath.Join(s.dir, manifestName(2)))
@@ -330,5 +327,69 @@ func TestMigrateRefusesDamagedVault(t *testing.T) {
 	}
 	if err := Migrate(dir, "pass123"); err == nil || !strings.Contains(err.Error(), "fsck") {
 		t.Fatalf("migrate on a damaged vault = %v, want fsck refusal", err)
+	}
+}
+
+// TestMigrateResumeAfterPartialReseal covers the resume whose earlier
+// run got partway through the reseal loop: one generation already
+// v2-sealed, the rest still v1. The re-run must finish (skip-already-v2
+// + reseal + close the window), not answer "already on v2".
+func TestMigrateResumeAfterPartialReseal(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "v.coffer")
+	s, err := CreateFormat(dir, "pass123", crypto.DefaultParams(), crypto.FormatVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitGeneration(t, s, 'a')
+	commitGeneration(t, s, 'b')
+
+	// Crash window: meta flipped, and only the OLDEST generation was
+	// resealed before the run died.
+	opener, err := Open(dir, "pass123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	opener.meta.FormatVersion = crypto.FormatVersionV2
+	if err := opener.rewriteMeta(); err != nil {
+		t.Fatal(err)
+	}
+	release, err := opener.AcquireLock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Reseal the oldest generation still on disk (the kept bound may
+	// have pruned lower numbers).
+	gens := GenerationNums(dir)
+	if err := opener.resealGeneration(gens[len(gens)-1]); err != nil {
+		release()
+		t.Fatal(err)
+	}
+	release()
+
+	if err := Migrate(dir, "pass123"); err != nil {
+		t.Fatalf("resume migrate: %v", err)
+	}
+	meta, err := ReadMeta(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta.ManifestSeal < crypto.FormatVersionV2 {
+		t.Fatal("resume did not close the migration window")
+	}
+	s2, err := Open(dir, "pass123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range GenerationNums(dir) {
+		raw, err := os.ReadFile(filepath.Join(dir, manifestName(n)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := crypto.OpenManifestV2(s2.dek, meta.ID, n, raw); err != nil {
+			t.Errorf("generation %d still not v2-sealed after resume: %v", n, err)
+		}
+	}
+	if got := s2.Manifest().Refs["refs/heads/main"].OID; got != oidOf('b') {
+		t.Fatalf("refs after resume = %q, want the migrated tip", got)
 	}
 }
